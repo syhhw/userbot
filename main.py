@@ -10,6 +10,15 @@ import time
 import logging
 import asyncio
 
+# ==========================================
+# 🟢 PYROMOD — deve ser importado ANTES do Client
+# Injeta o método client.listen() necessário para o comando ,kang
+# ==========================================
+try:
+    import pyromod
+except ImportError:
+    pass  # pyromod não instalado; instale com: pip install pyromod
+
 from pyrogram import Client, idle
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
