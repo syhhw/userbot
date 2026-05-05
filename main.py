@@ -80,7 +80,7 @@ app = Client(
     api_hash=config["API_HASH"],
     device_model="Samsung Galaxy S25",
     system_version="Android 14",
-    plugins=dict(root="plugins")
+    plugins=dict(root="plugins")  # Carrega automaticamente todos os arquivos da pasta plugins/
 )
 
 # Anexa objetos globais ao cliente para que os plugins possam acessá-los
@@ -109,7 +109,6 @@ async def iniciar():
 
     # Aviso de inicialização no canal de logs
     try:
-        # Se o boot veio de uma atualização, manda relatório enriquecido
         if os.path.exists(UPDATE_FLAG):
             try:
                 with open(UPDATE_FLAG, "r", encoding="utf-8") as f:
@@ -150,6 +149,7 @@ async def iniciar():
     await idle()
     await app.stop()
     logger.info("👋 Userbot encerrado.")
+
 
 if __name__ == "__main__":
     try:

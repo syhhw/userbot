@@ -1,0 +1,292 @@
+"""
+plugins/tools.py
+Ferramentas e diversão: hack, type, ghost, fake, tr, voz, print, encurtar, ipinfo, clima, specs
+"""
+import os
+import re
+import asyncio
+import random
+import textwrap
+import requests
+
+from gtts import gTTS
+from PIL import Image, ImageDraw, ImageFont
+from pyrogram import filters, enums, Client
+from deep_translator import GoogleTranslator
+from utils.helpers import cmd_filter, prefixo
+
+
+@Client.on_message(cmd_filter("hack") & filters.me)
+async def cmd_hack(client, message):
+    """Simula um hack animado (diversão)."""
+    alvo = message.reply_to_message.from_user.first_name if message.reply_to_message else "SISTEMA"
+    passos = [
+        f"💀 **TARGET LOCKED:** `{alvo}`\n🔍 Scanning open ports...",
+        f"🌐 `[▰▰▱▱▱▱▱▱▱▱]` 20%\n🔓 Bypassing firewall...",
+        f"🔑 `[▰▰▰▰▱▱▱▱▱▱]` 40%\n💉 Injecting SQL payload...",
+        f"🔥 `[▰▰▰▰▰▰▱▱▱▱]` 60%\n🔐 Brute-forcing SSH...",
+        f"⚡ `[▰▰▰▰▰▰▰▰▱▱]` 80%\n🖥️ Root access granted!",
+        f"☢️ `[▰▰▰▰▰▰▰▰▰▰]` 100%\n\n💀 **HACK COMPLETO**\n🎯 `{alvo}` comprometido.\n🔒 Sistema sob controle."
+    ]
+    for passo in passos:
+        try:
+            await message.edit_text(passo)
+            await asyncio.sleep(random.uniform(0.9, 1.5))
+        except:
+            pass
+
+
+@Client.on_message(cmd_filter("type") & filters.me)
+async def cmd_type(client, message):
+    """Simula digitação letra por letra."""
+    p = prefixo(client)
+    partes = message.text.split(None, 1)
+    if len(partes) < 2:
+        return await message.edit_text(f"⚠️ Use: `{p}type [texto]`")
+    texto = partes[1]
+    digitado = ""
+    for ch in texto:
+        digitado += ch
+        try:
+            await message.edit_text(f"{digitado}▌")
+            await asyncio.sleep(0.07)
+        except:
+            pass
+    await message.edit_text(digitado)
+
+
+@Client.on_message(cmd_filter("ghost") & filters.me)
+async def cmd_ghost(client, message):
+    """Envia uma mensagem que se autodestrói após N segundos."""
+    p = prefixo(client)
+    partes = message.text.split(None, 2)
+    if len(partes) < 3:
+        return await message.edit_text(f"⚠️ Use: `{p}ghost [segundos] [texto]`")
+    if not partes[1].isdigit():
+        return await message.edit_text(f"⚠️ Tempo inválido. Ex: `{p}ghost 10 Olá`")
+    tempo = int(partes[1])
+    texto = partes[2]
+    await message.edit_text(f"👻 **[Autodestrutiva em {tempo}s]**\n\n{texto}")
+    await asyncio.sleep(tempo)
+    try:
+        await message.delete()
+    except:
+        pass
+
+
+@Client.on_message(cmd_filter("fake") & filters.me)
+async def cmd_fake(client, message):
+    """Simula ação de digitação, gravação de áudio ou vídeo."""
+    p = prefixo(client)
+    partes = message.text.split(None, 1)
+    if len(partes) < 2:
+        return await message.edit_text(f"⚠️ Use: `{p}fake [audio|video|typing]`")
+    tipo = partes[1].strip().lower()
+    try:
+        await message.delete()
+    except:
+        pass
+    if tipo == "audio":
+        acao = enums.ChatAction.RECORD_AUDIO
+    elif tipo == "video":
+        acao = enums.ChatAction.RECORD_VIDEO
+    else:
+        acao = enums.ChatAction.TYPING
+    for _ in range(4):
+        try:
+            await client.send_chat_action(message.chat.id, acao)
+            await asyncio.sleep(5)
+        except:
+            break
+
+
+@Client.on_message(cmd_filter("tr") & filters.me)
+async def cmd_tr(client, message):
+    """Traduz uma mensagem respondida para o idioma especificado."""
+    if not message.reply_to_message:
+        return await message.edit_text("⚠️ Responda ao texto a traduzir.")
+    partes = message.text.split(None, 1)
+    alvo = partes[1].strip() if len(partes) > 1 else "pt"
+    texto = message.reply_to_message.text or message.reply_to_message.caption
+    if not texto:
+        return await message.edit_text("⚠️ Mensagem sem texto.")
+    await message.edit_text(f"🌐 **Traduzindo para `{alvo}`...**")
+    try:
+        res = GoogleTranslator(source='auto', target=alvo).translate(texto)
+        await message.edit_text(f"🌐 **Tradução ({alvo.upper()}):**\n\n{res}")
+    except Exception as e:
+        await message.edit_text(f"❌ Erro: `{e}`")
+
+
+@Client.on_message(cmd_filter("voz") & filters.me)
+async def cmd_voz(client, message):
+    """Converte texto em mensagem de voz."""
+    p = prefixo(client)
+    partes = message.text.split(None, 1)
+    if len(partes) > 1:
+        texto = partes[1]
+    elif message.reply_to_message and (message.reply_to_message.text or message.reply_to_message.caption):
+        texto = message.reply_to_message.text or message.reply_to_message.caption
+    else:
+        return await message.edit_text(f"⚠️ Use: `{p}voz [texto]` ou responda a uma mensagem.")
+    await message.edit_text("🎙️ **Gerando áudio...**")
+    arquivo = "voz_temp.ogg"
+    try:
+        tts = gTTS(text=texto, lang='pt')
+        tts.save(arquivo)
+        await client.send_voice(message.chat.id, arquivo)
+        os.remove(arquivo)
+        await message.delete()
+    except Exception as e:
+        await message.edit_text(f"❌ Erro: `{e}`")
+        if os.path.exists(arquivo):
+            os.remove(arquivo)
+
+
+@Client.on_message(cmd_filter("print") & filters.me)
+async def cmd_print(client, message):
+    """Gera um print estilizado de uma mensagem respondida."""
+    if not message.reply_to_message:
+        return await message.edit_text("⚠️ Responda à mensagem para gerar o print.")
+    await message.edit_text("📸 **Gerando print...**")
+    arquivo = "print_temp.png"
+    try:
+        texto = message.reply_to_message.text or message.reply_to_message.caption or "[Mídia sem texto]"
+        autor = "Usuário"
+        if message.reply_to_message.from_user:
+            autor = message.reply_to_message.from_user.first_name
+        if not os.path.exists("Roboto-Medium.ttf"):
+            r = requests.get(
+                "https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Medium.ttf",
+                timeout=15
+            )
+            with open("Roboto-Medium.ttf", "wb") as f:
+                f.write(r.content)
+        ft = ImageFont.truetype("Roboto-Medium.ttf", 26)
+        fa = ImageFont.truetype("Roboto-Medium.ttf", 22)
+        linhas = textwrap.wrap(texto, width=38)
+        altura = 100 + (len(linhas) * 35)
+        img = Image.new('RGBA', (600, altura), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        d.rounded_rectangle([(10, 10), (590, altura - 10)], radius=15, fill=(33, 45, 59))
+        d.text((30, 25), autor, fill=(100, 181, 239), font=fa)
+        y = 65
+        for linha in linhas:
+            d.text((30, y), linha, fill=(255, 255, 255), font=ft)
+            y += 35
+        img.save(arquivo)
+        await client.send_document(message.chat.id, arquivo, file_name="Print.png")
+        os.remove(arquivo)
+        await message.delete()
+    except Exception as e:
+        await message.edit_text(f"❌ Erro: `{e}`")
+        if os.path.exists(arquivo):
+            os.remove(arquivo)
+
+
+@Client.on_message(cmd_filter("encurtar") & filters.me)
+async def cmd_encurtar(client, message):
+    """Encurta uma URL usando o TinyURL."""
+    p = prefixo(client)
+    partes = message.text.split(None, 1)
+    if len(partes) < 2:
+        return await message.edit_text(f"⚠️ Use: `{p}encurtar [URL]`")
+    url = partes[1].strip()
+    await message.edit_text("🔗 **Encurtando...**")
+    try:
+        r = requests.get(f"https://tinyurl.com/api-create.php?url={url}", timeout=10)
+        await message.edit_text(f"🔗 **Encurtado:**\n`{r.text}`")
+    except Exception as e:
+        await message.edit_text(f"❌ Erro: `{e}`")
+
+
+@Client.on_message(cmd_filter("ipinfo") & filters.me)
+async def cmd_ipinfo(client, message):
+    """Exibe informações sobre um endereço IP."""
+    partes = message.text.split(None, 1)
+    ip = partes[1].strip() if len(partes) > 1 else ""
+    await message.edit_text("🌐 **Buscando dados do IP...**")
+    try:
+        url = f"https://ipinfo.io/{ip}/json" if ip else "https://ipinfo.io/json"
+        r = requests.get(url, timeout=10).json()
+        await message.edit_text(
+            f"🌐 **IP Info**\n\n"
+            f"📍 IP: `{r.get('ip', 'N/A')}`\n"
+            f"🏙️ Cidade: `{r.get('city', 'N/A')}`\n"
+            f"🗺️ Região: `{r.get('region', 'N/A')}`\n"
+            f"🌍 País: `{r.get('country', 'N/A')}`\n"
+            f"🏢 Org: `{r.get('org', 'N/A')}`\n"
+            f"⏰ Fuso: `{r.get('timezone', 'N/A')}`"
+        )
+    except Exception as e:
+        await message.edit_text(f"❌ Erro: `{e}`")
+
+
+@Client.on_message(cmd_filter("clima") & filters.me)
+async def cmd_clima(client, message):
+    """Exibe o clima atual de uma cidade."""
+    partes = message.text.split(None, 1)
+    cidade = partes[1].strip() if len(partes) > 1 else "Sao Paulo"
+    await message.edit_text(f"🌤️ **Buscando clima de `{cidade}`...**")
+    try:
+        cidade_url = cidade.replace(" ", "+")
+        r = requests.get(
+            f"https://wttr.in/{cidade_url}?format=%l:+%C+%t+%h+%w&lang=pt",
+            timeout=10,
+            headers={"User-Agent": "curl/7.68.0"}
+        )
+        if r.status_code == 200 and "Unknown location" not in r.text and "ERROR" not in r.text:
+            await message.edit_text(f"🌍 **Clima:**\n`{r.text.strip()}`")
+        else:
+            await message.edit_text("❌ Localidade não encontrada.")
+    except requests.Timeout:
+        await message.edit_text("❌ Tempo esgotado. Tente novamente.")
+    except Exception as e:
+        await message.edit_text(f"❌ Erro: `{e}`")
+
+
+@Client.on_message(cmd_filter("specs") & filters.me)
+async def cmd_specs(client, message):
+    """Busca as especificações técnicas de um celular no GSMArena."""
+    p = prefixo(client)
+    partes = message.text.split(None, 1)
+    if len(partes) < 2:
+        return await message.edit_text(f"⚠️ Use: `{p}specs [modelo do celular]`")
+    modelo = partes[1].strip()
+    await message.edit_text(f"📱 **Buscando specs de `{modelo}`...**")
+    try:
+        termo = modelo.replace(" ", "+")
+        headers = {"User-Agent": "Mozilla/5.0 (Linux; Android 14)"}
+        r = requests.get(
+            f"https://www.gsmarena.com/results.php3?sQuickSearch=yes&sName={termo}",
+            headers=headers, timeout=15
+        )
+        links = re.findall(r'href="([a-z0-9_]+-\d+\.php)"', r.text)
+        if links:
+            url_ficha = f"https://www.gsmarena.com/{links[0]}"
+            r2 = requests.get(url_ficha, headers=headers, timeout=15)
+            html = r2.text
+            nome = re.search(r'<h1 class="specs-phone-name-title">(.*?)</h1>', html)
+            proc = re.search(r'data-spec="chipset">(.*?)</td>', html, re.DOTALL)
+            ram = re.search(r'data-spec="internalmemory">(.*?)</td>', html, re.DOTALL)
+            bat = re.search(r'data-spec="batdescription1">(.*?)</td>', html, re.DOTALL)
+            disp = re.search(r'data-spec="displaysize">(.*?)</td>', html, re.DOTALL)
+            cam = re.search(r'data-spec="cam1modules">(.*?)</td>', html, re.DOTALL)
+            limpar = lambda t: re.sub('<.*?>', '', t).strip() if t else "N/A"
+            await message.edit_text(
+                f"📱 **{nome.group(1).strip() if nome else modelo.upper()}**\n\n"
+                f"⚙️ Processador: `{limpar(proc.group(1)) if proc else 'N/A'}`\n"
+                f"💾 Memória: `{limpar(ram.group(1)) if ram else 'N/A'}`\n"
+                f"📺 Tela: `{limpar(disp.group(1)) if disp else 'N/A'}`\n"
+                f"📷 Câmera: `{limpar(cam.group(1))[:60] if cam else 'N/A'}`\n"
+                f"🔋 Bateria: `{limpar(bat.group(1))[:60] if bat else 'N/A'}`\n\n"
+                f"🔗 [Ficha completa]({url_ficha})"
+            )
+        else:
+            await message.edit_text(
+                f"📱 **{modelo.upper()}**\n\n"
+                f"⚠️ Modelo não encontrado no GSMArena.\n"
+                f"🔗 [Buscar no Google](https://www.google.com/search?q={termo}+specs)"
+            )
+    except Exception as e:
+        await message.edit_text(f"❌ Erro: `{e}`")
