@@ -5,6 +5,7 @@ Comandos de sistema: versao, atualizar, restart, ping, speed, sysinfo, processos
 import os
 import sys
 import time
+import signal
 import asyncio
 import psutil
 import humanize
@@ -29,6 +30,23 @@ def _git(*args, timeout=30):
 def _e_repositorio_git():
     cod, _, _ = _git("rev-parse", "--is-inside-work-tree", timeout=5)
     return cod == 0
+
+
+def _reiniciar_processo():
+    """
+    Reinicia o bot de forma limpa usando subprocess.
+    Evita o problema de múltiplos SIGINT causado pelo os.execl dentro de handlers async.
+    """
+    python = sys.executable
+    args   = sys.argv[:]
+
+    # Garante que o novo processo não entre no loop de perguntar sobre screen
+    if "--no-screen" not in args:
+        args.append("--no-screen")
+
+    subprocess.Popen([python] + args)
+    # Encerra o processo atual de forma limpa, sem propagar SIGINT
+    os.kill(os.getpid(), signal.SIGTERM)
 
 
 @Client.on_message(cmd_filter("versao") & filters.me)
@@ -66,13 +84,11 @@ async def cmd_versao(client, message):
 async def cmd_atualizar(client, message):
     """
     Auto-update via GitHub.
-      ,atualizar          → git pull padrão (aborta em conflito local)
-      ,atualizar forcar   → descarta alterações locais e força sincronia com origin
+      ,atualizar        → sempre usa git reset --hard origin/main (sem conflitos)
+      ,atualizar forcar → mesmo comportamento (mantido por compatibilidade)
     """
-    partes = message.text.split(None, 1)
-    forcar = len(partes) > 1 and partes[1].strip().lower() in ("forcar", "forçar", "force", "-f")
     versao_local = getattr(client, "VERSAO", "?")
-    update_flag = getattr(client, "UPDATE_FLAG", ".update_pending.json")
+    update_flag  = getattr(client, "UPDATE_FLAG", ".update_pending.json")
 
     if not _e_repositorio_git():
         return await message.edit_text(
@@ -83,6 +99,7 @@ async def cmd_atualizar(client, message):
 
     msg = await message.edit_text("🔄 **Buscando atualizações no GitHub...**")
 
+    # Fetch para atualizar as refs remotas
     cod, _, err = _git("fetch", "origin", timeout=30)
     if cod != 0:
         return await msg.edit_text(f"❌ **Falha no `git fetch`:**\n```\n{err[:300]}\n```")
@@ -92,7 +109,7 @@ async def cmd_atualizar(client, message):
 
     _, atras, _ = _git("rev-list", "--count", f"HEAD..origin/{branch}")
     atras = atras or "0"
-    if atras == "0" and not forcar:
+    if atras == "0":
         return await msg.edit_text(
             f"✅ **Userbot já está na versão mais recente!**\n"
             f"📦 v{versao_local} | branch `{branch}`"
@@ -104,17 +121,14 @@ async def cmd_atualizar(client, message):
 
     await msg.edit_text(
         f"⬇️ **Aplicando atualização** ({len(arquivos)} arquivo(s))...\n"
-        f"🔀 Modo: `{'FORÇADO' if forcar else 'normal'}`"
+        f"🔀 Modo: `RESET HARD → origin/{branch}`"
     )
-    if forcar:
-        cod, _, err = _git("reset", "--hard", f"origin/{branch}")
-    else:
-        cod, _, err = _git("pull", "--ff-only", "origin", branch)
 
+    # Usa sempre reset --hard para evitar conflitos de diverging branches
+    cod, _, err = _git("reset", "--hard", f"origin/{branch}")
     if cod != 0:
         return await msg.edit_text(
-            f"❌ **Falha ao aplicar atualização:**\n```\n{err[:400]}\n```\n\n"
-            f"💡 Dica: tente `,atualizar forcar` para descartar alterações locais."
+            f"❌ **Falha ao aplicar atualização:**\n```\n{err[:400]}\n```"
         )
 
     _, commit_hash, _ = _git("rev-parse", "--short", "HEAD")
@@ -134,23 +148,20 @@ async def cmd_atualizar(client, message):
 
     try:
         salvar(update_flag, {
-            "commit": commit_hash,
-            "mensagem": commit_msg,
-            "autor": commit_autor,
-            "arquivos": arquivos,
-            "forcado": forcar,
+            "commit":    commit_hash,
+            "mensagem":  commit_msg,
+            "autor":     commit_autor,
+            "arquivos":  arquivos,
             "timestamp": int(time.time()),
         })
-    except:
+    except Exception:
         pass
 
     await msg.edit_text("✅ **Atualização concluída! Reiniciando...**")
     await asyncio.sleep(2)
-    try:
-        await client.stop()
-    except:
-        pass
-    os.execl(sys.executable, sys.executable, *sys.argv)
+
+    # Reinicia de forma limpa (sem múltiplos SIGINT)
+    _reiniciar_processo()
 
 
 @Client.on_message(cmd_filter("restart") & filters.me)
@@ -158,11 +169,7 @@ async def cmd_restart(client, message):
     """Reinicia o userbot."""
     await message.edit_text("🔄 **Reiniciando...**")
     await asyncio.sleep(1)
-    try:
-        await client.stop()
-    except:
-        pass
-    os.execl(sys.executable, sys.executable, *sys.argv)
+    _reiniciar_processo()
 
 
 @Client.on_message(cmd_filter("ping") & filters.me)
@@ -198,8 +205,8 @@ async def cmd_speed(client, message):
 @Client.on_message(cmd_filter("sysinfo") & filters.me)
 async def cmd_sysinfo(client, message):
     """Exibe informações de CPU, RAM e disco da VM."""
-    cpu = psutil.cpu_percent(interval=1)
-    ram = psutil.virtual_memory()
+    cpu   = psutil.cpu_percent(interval=1)
+    ram   = psutil.virtual_memory()
     disco = psutil.disk_usage('/')
     inicio = getattr(client, "tempo_inicio", time.time())
     uptime = humanize.precisedelta(time.time() - inicio, minimum_unit="seconds")
