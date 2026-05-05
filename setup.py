@@ -1,49 +1,133 @@
 """
 🚀 USERBOT PRO v1.0 - setup.py
-Configurador interativo: verifica ambiente, sessão, Drive e bibliotecas
-antes de gerar o config.json.
+Configurador interativo inteligente:
+  - Detecta e ativa a venv automaticamente antes de qualquer verificação.
+  - Instala dependências faltantes automaticamente dentro da venv.
+  - Google Drive é totalmente opcional.
+  - Qualquer erro inesperado durante o setup é reportado ao canal de logs do dono.
 """
 import os
+import sys
 import json
+import subprocess
 import importlib
 
-VERDE = "\033[92m"
+# ══════════════════════════════════════════════════════════════════════════════
+# 🎨 CORES DO TERMINAL
+# ══════════════════════════════════════════════════════════════════════════════
+VERDE   = "\033[92m"
 VERMELHO = "\033[91m"
 AMARELO = "\033[93m"
-AZUL = "\033[94m"
+AZUL    = "\033[94m"
+CIANO   = "\033[96m"
 NEGRITO = "\033[1m"
-RESET = "\033[0m"
+RESET   = "\033[0m"
 
+# ══════════════════════════════════════════════════════════════════════════════
+# 🟡 BLOCO 1 — DETECÇÃO E ATIVAÇÃO AUTOMÁTICA DA VENV
+# Deve ser o PRIMEIRO bloco, antes de qualquer verificação de bibliotecas.
+# ══════════════════════════════════════════════════════════════════════════════
+def _esta_em_venv() -> bool:
+    return (
+        hasattr(sys, "real_prefix")
+        or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix)
+    )
 
+def _garantir_venv():
+    """Cria a venv se não existir e reinicia o setup dentro dela."""
+    if _esta_em_venv():
+        return  # Já está na venv, tudo certo
+
+    venv_dir = "venv"
+    candidatos = [
+        os.path.join(venv_dir, "bin", "python3"),
+        os.path.join(venv_dir, "bin", "python"),
+        os.path.join(venv_dir, "Scripts", "python.exe"),
+    ]
+    python_venv = next((c for c in candidatos if os.path.isfile(c)), None)
+
+    if not python_venv:
+        print(f"\n{AMARELO}⚠️  Ambiente virtual não encontrado. Criando venv...{RESET}")
+        ret = subprocess.run([sys.executable, "-m", "venv", venv_dir])
+        if ret.returncode != 0:
+            print(f"{VERMELHO}❌ Falha ao criar venv. Verifique se python3-venv está instalado:{RESET}")
+            print(f"   {AMARELO}sudo apt install python3-venv{RESET}\n")
+            sys.exit(1)
+        print(f"{VERDE}✅ Venv criada em '{venv_dir}/'!{RESET}\n")
+        python_venv = next((c for c in candidatos if os.path.isfile(c)), None)
+
+    if python_venv:
+        print(f"{AMARELO}⚠️  Reiniciando setup dentro da venv...{RESET}\n")
+        os.execv(python_venv, [python_venv] + sys.argv)
+    else:
+        print(f"{VERMELHO}❌ Não foi possível encontrar o Python da venv.{RESET}\n")
+        sys.exit(1)
+
+_garantir_venv()
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 🟢 FUNÇÕES AUXILIARES
+# ══════════════════════════════════════════════════════════════════════════════
 def cabecalho():
     print(f"\n{AZUL}{NEGRITO}╔════════════════════════════════════════════╗{RESET}")
     print(f"{AZUL}{NEGRITO}║   🚀 USERBOT PRO v1.0 - SETUP INTELIGENTE  ║{RESET}")
     print(f"{AZUL}{NEGRITO}╚════════════════════════════════════════════╝{RESET}\n")
+    print(f"  {CIANO}Python:{RESET} {sys.executable}")
+    print(f"  {CIANO}Venv ativa:{RESET} {VERDE}Sim ✅{RESET}\n")
 
 
 def checar_arquivo(arq, descricao, critico=True):
     if os.path.exists(arq):
         print(f"  {VERDE}✅{RESET} {descricao}: {VERDE}encontrado{RESET}")
         return True
-    cor = VERMELHO if critico else AMARELO
+    cor   = VERMELHO if critico else AMARELO
     icone = "❌" if critico else "⚠️"
     print(f"  {cor}{icone}{RESET} {descricao}: {cor}não encontrado{RESET}")
     return False
 
 
-def verificar_bibliotecas():
-    print(f"\n{NEGRITO}📦 Verificando dependências do Python...{RESET}\n")
+def instalar_dependencias(faltando: list) -> bool:
+    """Tenta instalar as dependências faltantes via pip dentro da venv."""
+    req_file = "requirements.txt"
+    if os.path.exists(req_file):
+        print(f"\n  {AMARELO}▶ Instalando dependências de requirements.txt...{RESET}")
+        ret = subprocess.run([sys.executable, "-m", "pip", "install", "-r", req_file, "-q"])
+        if ret.returncode == 0:
+            print(f"  {VERDE}✅ Dependências instaladas com sucesso!{RESET}")
+            return True
+        else:
+            print(f"  {VERMELHO}❌ Falha na instalação via requirements.txt.{RESET}")
+    else:
+        # Instala uma por uma se não tiver requirements.txt
+        print(f"\n  {AMARELO}▶ Instalando dependências manualmente...{RESET}")
+        pacotes_pip = {
+            "pyrogram": "pyrogram", "pydrive2": "PyDrive2", "requests": "requests",
+            "humanize": "humanize", "speedtest": "speedtest-cli", "PIL": "Pillow",
+            "gtts": "gTTS", "deep_translator": "deep-translator",
+            "psutil": "psutil", "tgcrypto": "TgCrypto", "pyromod": "pyromod",
+        }
+        for lib in faltando:
+            pkg = pacotes_pip.get(lib, lib)
+            ret = subprocess.run([sys.executable, "-m", "pip", "install", pkg, "-q"])
+            icone = f"{VERDE}✅{RESET}" if ret.returncode == 0 else f"{VERMELHO}❌{RESET}"
+            print(f"  {icone} {pkg}")
+    return False
+
+
+def verificar_bibliotecas() -> list:
+    """Verifica quais bibliotecas estão faltando (Drive excluído — é opcional)."""
+    print(f"\n{NEGRITO}📦 [2/5] Verificando dependências do Python...{RESET}\n")
     libs = [
-        ("pyrogram", "pyrogram"),
-        ("pydrive2", "PyDrive2"),
-        ("requests", "requests"),
-        ("humanize", "humanize"),
-        ("speedtest", "speedtest-cli"),
-        ("PIL", "Pillow"),
-        ("gtts", "gTTS"),
+        ("pyrogram",        "pyrogram"),
+        ("requests",        "requests"),
+        ("humanize",        "humanize"),
+        ("speedtest",       "speedtest-cli"),
+        ("PIL",             "Pillow"),
+        ("gtts",            "gTTS"),
         ("deep_translator", "deep-translator"),
-        ("psutil", "psutil"),
-        ("tgcrypto", "TgCrypto"),
+        ("psutil",          "psutil"),
+        ("tgcrypto",        "TgCrypto"),
+        ("pyromod",         "pyromod"),
     ]
     faltando = []
     for lib_import, lib_name in libs:
@@ -52,93 +136,157 @@ def verificar_bibliotecas():
             print(f"  {VERDE}✅{RESET} {lib_name}")
         except ImportError:
             print(f"  {VERMELHO}❌{RESET} {lib_name}")
-            faltando.append(lib_name)
+            faltando.append(lib_import)
     return faltando
 
 
+def reportar_erro_logs(api_id, api_hash, canal_id, erro: str):
+    """
+    Tenta enviar uma mensagem de erro ao canal de logs do dono via API HTTP
+    do Telegram (sem precisar do Pyrogram completo).
+    Usado para notificar bugs de outros usuários durante o setup.
+    """
+    try:
+        import requests as req
+        # Usa o bot @userinfobot como fallback não funciona — precisamos de um bot token.
+        # Se o usuário configurou BOT_TOKEN no config.json, usamos ele.
+        config_path = "config.json"
+        if not os.path.exists(config_path):
+            return
+        with open(config_path) as f:
+            cfg = json.load(f)
+        bot_token = cfg.get("BOT_TOKEN")
+        if not bot_token or not canal_id:
+            return
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        texto = (
+            f"🚨 **ERRO NO SETUP — USERBOT PRO**\n\n"
+            f"👤 Usuário com API_ID: `{api_id}`\n"
+            f"❌ Erro: `{erro}`\n"
+            f"🖥️ Python: `{sys.version}`\n"
+            f"📂 Dir: `{os.getcwd()}`"
+        )
+        req.post(url, json={"chat_id": canal_id, "text": texto, "parse_mode": "Markdown"}, timeout=5)
+    except Exception:
+        pass  # Silencioso — não deve travar o setup
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 🟢 FUNÇÃO PRINCIPAL
+# ══════════════════════════════════════════════════════════════════════════════
 def main():
     cabecalho()
 
-    # --- VERIFICAÇÃO DE AMBIENTE ---
-    print(f"{NEGRITO}🔍 [1/4] Verificando arquivos do ambiente...{RESET}\n")
+    # ── [1/5] VERIFICAÇÃO DE ARQUIVOS ────────────────────────────────────────
+    print(f"{NEGRITO}🔍 [1/5] Verificando arquivos do ambiente...{RESET}\n")
     sessao = checar_arquivo("meu_userbot.session", "Sessão Pyrogram", critico=False)
-    drive_creds = checar_arquivo("meu_drive.json", "Credenciais Google Drive", critico=False)
-    drive_secrets = checar_arquivo("client_secrets.json", "Client Secrets do Drive", critico=False)
-    req = checar_arquivo("requirements.txt", "requirements.txt", critico=False)
+    req    = checar_arquivo("requirements.txt",    "requirements.txt", critico=False)
 
     if sessao:
-        print(f"\n  {VERDE}🎉 Sessão do Telegram já está ativa! Não precisará logar.{RESET}")
+        print(f"\n  {VERDE}🎉 Sessão do Telegram já está ativa! Não precisará logar novamente.{RESET}")
     else:
         print(f"\n  {AMARELO}ℹ️  Você fará login no Telegram na primeira execução do bot.{RESET}")
 
-    if not (drive_creds and drive_secrets):
-        print(f"\n  {AMARELO}⚠️  Coloque os arquivos do Drive na pasta antes de iniciar:{RESET}")
-        print(f"     - {AMARELO}meu_drive.json{RESET}")
-        print(f"     - {AMARELO}client_secrets.json{RESET}")
-
-    # --- VERIFICAÇÃO DE BIBLIOTECAS ---
-    print(f"\n{NEGRITO}📦 [2/4] Verificando bibliotecas...{RESET}")
+    # ── [2/5] VERIFICAÇÃO DE BIBLIOTECAS ─────────────────────────────────────
     faltando = verificar_bibliotecas()
     if faltando:
-        print(f"\n  {VERMELHO}❌ Faltam bibliotecas. Instale com:{RESET}")
-        print(f"     {AMARELO}pip install -r requirements.txt{RESET}")
-        if not req:
-            print(f"  {AMARELO}⚠️  requirements.txt não encontrado!{RESET}")
-        resp = input(f"\n  ❓ Continuar mesmo assim? (s/N): ").strip().lower()
-        if resp != "s":
-            print(f"\n{VERMELHO}Setup interrompido.{RESET}\n")
-            return
+        print(f"\n  {AMARELO}⚠️  Bibliotecas faltando: {', '.join(faltando)}{RESET}")
+        resp = input(f"\n  ❓ Instalar automaticamente agora? (S/n): ").strip().lower()
+        if resp in ("", "s"):
+            instalar_dependencias(faltando)
+        else:
+            resp2 = input(f"  ❓ Continuar mesmo assim? (s/N): ").strip().lower()
+            if resp2 != "s":
+                print(f"\n{VERMELHO}Setup interrompido.{RESET}\n")
+                return
     else:
         print(f"\n  {VERDE}✅ Todas as bibliotecas estão prontas!{RESET}")
 
-    # --- VERIFICAÇÃO DE CONFIG EXISTENTE ---
-    print(f"\n{NEGRITO}⚙️  [3/4] Verificando configuração existente...{RESET}\n")
+    # ── [3/5] GOOGLE DRIVE (OPCIONAL) ────────────────────────────────────────
+    print(f"\n{NEGRITO}📂 [3/5] Google Drive (opcional)...{RESET}\n")
+    print(f"  O Google Drive permite que o bot faça backup e organize seus arquivos.")
+    print(f"  {AMARELO}Você pode pular esta etapa e configurar depois.{RESET}\n")
+
+    usar_drive = input(f"  ❓ Deseja configurar o Google Drive? (s/N): ").strip().lower()
+    drive_ativo = usar_drive == "s"
+
+    if drive_ativo:
+        drive_creds   = checar_arquivo("meu_drive.json",       "Credenciais Google Drive", critico=False)
+        drive_secrets = checar_arquivo("client_secrets.json",  "Client Secrets do Drive",  critico=False)
+        if not (drive_creds and drive_secrets):
+            print(f"\n  {AMARELO}⚠️  Coloque os arquivos na pasta antes de iniciar o bot:{RESET}")
+            print(f"     - {AMARELO}meu_drive.json{RESET}")
+            print(f"     - {AMARELO}client_secrets.json{RESET}")
+            print(f"  {AMARELO}O Drive ficará como OFFLINE até os arquivos serem adicionados.{RESET}")
+    else:
+        print(f"  {CIANO}ℹ️  Google Drive ignorado. Pode ser ativado depois editando config.json.{RESET}")
+
+    # ── [4/5] VERIFICAÇÃO DE CONFIG EXISTENTE ────────────────────────────────
+    print(f"\n{NEGRITO}⚙️  [4/5] Verificando configuração existente...{RESET}\n")
     if os.path.exists("config.json"):
         print(f"  {AMARELO}⚠️  Já existe um config.json.{RESET}")
         try:
             with open("config.json", "r", encoding="utf-8") as f:
                 atual = json.load(f)
-            print(f"     • API_ID: {atual.get('API_ID', '?')}")
+            print(f"     • API_ID:  {atual.get('API_ID', '?')}")
             print(f"     • Prefixo: '{atual.get('PREFIXO', ',')}'")
-        except:
+            print(f"     • Drive:   {'Ativo' if atual.get('DRIVE_ATIVO') else 'Inativo'}")
+        except Exception:
             print(f"     {VERMELHO}(arquivo malformado, será sobrescrito){RESET}")
         resp = input(f"\n  ❓ Deseja sobrescrever? (s/N): ").strip().lower()
         if resp != "s":
             print(f"\n  {VERDE}✅ Mantendo configurações atuais. Setup encerrado.{RESET}\n")
             return
 
-    # --- COLETA DE DADOS ---
-    print(f"\n{NEGRITO}📝 [4/4] Configuração das credenciais...{RESET}\n")
+    # ── [5/5] COLETA DE DADOS ─────────────────────────────────────────────────
+    print(f"\n{NEGRITO}📝 [5/5] Configuração das credenciais...{RESET}\n")
     print(f"  {AMARELO}ℹ️  Obtenha API_ID e API_HASH em: https://my.telegram.org{RESET}\n")
 
     config = {}
+    api_id_raw = None
+    canal_id   = None
+
     try:
-        config['API_ID'] = int(input(f"  🔑 API_ID: ").strip())
-        config['API_HASH'] = input(f"  🔐 API_HASH: ").strip()
-        config['ID_CANAL_LOGS'] = int(input(f"  📡 ID do canal de logs (com -100): ").strip())
-        config['ID_PASTA_RAIZ_DRIVE'] = input(f"  📁 ID da pasta raiz do Google Drive: ").strip()
-        config['PREFIXO'] = input(f"  ⌨️  Prefixo dos comandos (padrão ','): ").strip() or ","
-        limite = input(f"  📦 Limite auto-upload em MB (padrão 20): ").strip() or "20"
-        config['LIMITE_AUTO_UPLOAD'] = int(limite) * 1024 * 1024
+        api_id_raw              = input(f"  🔑 API_ID: ").strip()
+        config['API_ID']        = int(api_id_raw)
+        config['API_HASH']      = input(f"  🔐 API_HASH: ").strip()
+        canal_raw               = input(f"  📡 ID do canal de logs (com -100): ").strip()
+        config['ID_CANAL_LOGS'] = int(canal_raw)
+        canal_id                = config['ID_CANAL_LOGS']
+        config['PREFIXO']       = input(f"  ⌨️  Prefixo dos comandos (padrão ','): ").strip() or ","
+        config['DRIVE_ATIVO']   = drive_ativo
+
+        if drive_ativo:
+            pasta = input(f"  📁 ID da pasta raiz do Google Drive: ").strip()
+            config['ID_PASTA_RAIZ_DRIVE'] = pasta
+            limite = input(f"  📦 Limite auto-upload em MB (padrão 20): ").strip() or "20"
+            config['LIMITE_AUTO_UPLOAD'] = int(limite) * 1024 * 1024
+
+        # BOT_TOKEN opcional — usado para reportar erros de outros usuários
+        print(f"\n  {CIANO}ℹ️  (Opcional) Token de um bot para reportar erros de outros usuários ao seu canal.{RESET}")
+        bot_token = input(f"  🤖 BOT_TOKEN (Enter para pular): ").strip()
+        if bot_token:
+            config['BOT_TOKEN'] = bot_token
 
         with open("config.json", "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4, ensure_ascii=False)
 
         print(f"\n{VERDE}{NEGRITO}✅ config.json criado com sucesso!{RESET}\n")
         print(f"{AZUL}🚀 Próximos passos:{RESET}")
-        if faltando:
-            print(f"   1. Instale dependências: {AMARELO}pip install -r requirements.txt{RESET}")
-            print(f"   2. Inicie o bot: {AMARELO}python3 main.py{RESET}")
-        else:
-            print(f"   • Inicie o bot: {AMARELO}python3 main.py{RESET}")
+        print(f"   • Inicie o bot: {VERDE}python3 main.py{RESET}")
         print()
 
-    except ValueError:
-        print(f"\n{VERMELHO}❌ Erro: API_ID e ID do Canal devem ser apenas números.{RESET}\n")
+    except ValueError as e:
+        msg = f"API_ID e ID do Canal devem ser apenas números. Detalhe: {e}"
+        print(f"\n{VERMELHO}❌ Erro: {msg}{RESET}\n")
+        reportar_erro_logs(api_id_raw, config.get('API_HASH'), canal_id, msg)
+
     except KeyboardInterrupt:
         print(f"\n\n{AMARELO}Cancelado pelo usuário.{RESET}\n")
+
     except Exception as e:
         print(f"\n{VERMELHO}❌ Erro inesperado: {e}{RESET}\n")
+        reportar_erro_logs(api_id_raw, config.get('API_HASH'), canal_id, str(e))
 
 
 if __name__ == "__main__":
