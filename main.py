@@ -8,60 +8,79 @@ Inteligência automática:
     automaticamente usando o Python da venv local (./venv/).
   - Detecta se é novo usuário (config.json ausente) e redireciona para
     o setup.py interativo antes de iniciar.
-  - Pergunta se o usuário quer rodar em segundo plano via screen.
-    Se sim, cria/reutiliza uma sessão screen e avisa no canal de logs
-    o comando para retornar à sessão.
+  - Pergunta se o usuário quer rodar em segundo plano via nohup.
+    Se sim, relança o processo com nohup e encerra o processo atual.
 """
 import os
 import sys
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 🟡 BLOCO 1 — DETECÇÃO E ATIVAÇÃO AUTOMÁTICA DA VENV
-# Deve ser o PRIMEIRO bloco do arquivo, antes de qualquer outro import.
+# 🟡 BLOCO 1 — PASSO 1: DETECÇÃO E ATIVAÇÃO DA VENV
+# Se não estiver na venv, reinicia com o Python dela via os.execv.
+# os.execv substitui o processo atual — não cria filho, sem loop.
 # ══════════════════════════════════════════════════════════════════════════════
-def _esta_em_venv() -> bool:
-    """Retorna True se o Python atual está rodando dentro de uma venv."""
+
+AMARELO = "\033[93m"
+VERDE   = "\033[92m"
+AZUL    = "\033[94m"
+NEGRITO = "\033[1m"
+RESET   = "\033[0m"
+
+def _em_venv() -> bool:
     return (
         hasattr(sys, "real_prefix")
         or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix)
     )
 
-def _reiniciar_em_venv():
-    """Reinicia o script usando o Python da venv local (./venv/)."""
-    VERDE   = "\033[92m"
-    AMARELO = "\033[93m"
-    RESET   = "\033[0m"
+if not _em_venv():
+    _base        = os.path.dirname(os.path.abspath(__file__))
+    _python_venv = os.path.join(_base, "venv", "bin", "python3")
 
-    candidatos = [
-        os.path.join("venv", "bin", "python3"),
-        os.path.join("venv", "bin", "python"),
-        os.path.join("venv", "Scripts", "python.exe"),
-    ]
-
-    python_venv = next((c for c in candidatos if os.path.isfile(c)), None)
-
-    if python_venv:
-        print(f"{AMARELO}⚠️  Venv não ativa. Reiniciando com: {python_venv}{RESET}")
-        os.execv(python_venv, [python_venv] + sys.argv)
+    if os.path.isfile(_python_venv):
+        print(f"{AMARELO}⚠️  Venv detectada. Reiniciando com: {_python_venv}{RESET}")
+        os.execv(_python_venv, [_python_venv] + sys.argv)
+        # os.execv substitui o processo — nada abaixo é executado
     else:
-        print(f"{AMARELO}⚠️  Pasta 'venv/' não encontrada. Rodando com Python do sistema.{RESET}")
-        print(f"   Crie a venv com: {VERDE}python3 -m venv venv && source venv/bin/activate{RESET}")
-        print(f"   E instale as dependências: {VERDE}pip install -r requirements.txt{RESET}\n")
+        print(f"{AMARELO}⚠️  Pasta venv/ não encontrada. Rodando com Python do sistema.{RESET}")
+        print(f"   Crie com: {VERDE}python3 -m venv venv && source venv/bin/activate{RESET}")
+        print(f"   Depois:   {VERDE}pip install -r requirements.txt{RESET}\n")
 
-if not _esta_em_venv():
-    _reiniciar_em_venv()
+# ══════════════════════════════════════════════════════════════════════════════
+# 🟡 BLOCO 1 — PASSO 2: SEGUNDO PLANO VIA NOHUP
+# Pergunta se quer rodar em background. Se sim, relança com nohup e encerra.
+# A flag --background evita que o processo filho pergunte de novo.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _ja_esta_em_screen() -> bool:
+    """Detecta se já está dentro de uma sessão screen (para o aviso no log)."""
+    return "STY" in os.environ or os.environ.get("TERM") == "screen"
+
+if "--background" not in sys.argv:
+    print(f"\n{AZUL}{NEGRITO}╔════════════════════════════════════════════╗{RESET}")
+    print(f"{AZUL}{NEGRITO}║   🖥️  MODO DE EXECUÇÃO                      ║{RESET}")
+    print(f"{AZUL}{NEGRITO}╚════════════════════════════════════════════╝{RESET}\n")
+    print(f"  {VERDE}• Primeiro plano:{RESET} o bot para quando você fechar o terminal.")
+    print(f"  {VERDE}• Segundo plano:{RESET}  o bot continua rodando mesmo após fechar o terminal.\n")
+
+    _resp = input("  ❓ Rodar em segundo plano? (S/n): ").strip().lower()
+
+    if _resp in ("", "s"):
+        _script = os.path.abspath(__file__)
+        _log    = os.path.join(os.path.dirname(_script), "userbot.log")
+        _cmd    = f"nohup {sys.executable} {_script} --background > {_log} 2>&1 &"
+
+        os.system(_cmd)
+        print(f"\n{VERDE}✅ Bot iniciado em segundo plano!{RESET}")
+        print(f"   Log em: {_log}")
+        print(f"   Para parar: {AMARELO}kill $(pgrep -f 'python.*main.py'){RESET}\n")
+        sys.exit(0)
+    else:
+        print(f"\n  {VERDE}▶ Rodando em primeiro plano...{RESET}\n")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 🟡 BLOCO 2 — DETECÇÃO DE NOVO USUÁRIO (config.json ausente)
 # ══════════════════════════════════════════════════════════════════════════════
 def _verificar_primeiro_uso():
-    """Se config.json não existir, executa o setup.py interativo."""
-    AZUL    = "\033[94m"
-    VERDE   = "\033[92m"
-    AMARELO = "\033[93m"
-    NEGRITO = "\033[1m"
-    RESET   = "\033[0m"
-
     if not os.path.exists("config.json"):
         print(f"\n{AZUL}{NEGRITO}╔════════════════════════════════════════════╗{RESET}")
         print(f"{AZUL}{NEGRITO}║   🚀 USERBOT PRO — PRIMEIRO USO DETECTADO  ║{RESET}")
@@ -91,84 +110,7 @@ def _verificar_primeiro_uso():
 _verificar_primeiro_uso()
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 🟡 BLOCO 3 — OPÇÃO DE RODAR EM SEGUNDO PLANO VIA SCREEN
-# Pergunta ao usuário se deseja rodar em background.
-# Se sim, cria/reutiliza uma sessão screen e relança o processo dentro dela.
-# ══════════════════════════════════════════════════════════════════════════════
-SCREEN_NAME = "userbot"
-
-def _verificar_screen_disponivel() -> bool:
-    """Verifica se o comando 'screen' está instalado no sistema."""
-    return os.system("which screen > /dev/null 2>&1") == 0
-
-def _ja_esta_em_screen() -> bool:
-    """Retorna True se o processo já está rodando dentro de uma sessão screen."""
-    return "STY" in os.environ or os.environ.get("TERM") == "screen"
-
-def _perguntar_segundo_plano():
-    """Pergunta se o usuário quer rodar em segundo plano e relança via screen se sim."""
-    AZUL    = "\033[94m"
-    VERDE   = "\033[92m"
-    AMARELO = "\033[93m"
-    NEGRITO = "\033[1m"
-    RESET   = "\033[0m"
-
-    # Não pergunta se já está dentro do screen ou se foi iniciado com flag --no-screen
-    if _ja_esta_em_screen() or "--no-screen" in sys.argv:
-        return
-
-    if not _verificar_screen_disponivel():
-        print(f"  {AMARELO}ℹ️  'screen' não encontrado. Rodando em primeiro plano.{RESET}")
-        print(f"     Instale com: {VERDE}sudo apt install screen{RESET}\n")
-        return
-
-    print(f"\n{AZUL}{NEGRITO}╔════════════════════════════════════════════╗{RESET}")
-    print(f"{AZUL}{NEGRITO}║   🖥️  MODO DE EXECUÇÃO                      ║{RESET}")
-    print(f"{AZUL}{NEGRITO}╚════════════════════════════════════════════╝{RESET}\n")
-    print(f"  {VERDE}• Primeiro plano:{RESET} o bot para quando você fechar o terminal.")
-    print(f"  {VERDE}• Segundo plano (screen):{RESET} o bot continua rodando mesmo após fechar o terminal.\n")
-
-    resp = input(f"  ❓ Rodar em segundo plano? (S/n): ").strip().lower()
-
-    if resp in ("", "s"):
-        script_path = os.path.abspath(sys.argv[0])
-        pasta       = os.path.dirname(script_path)
-
-        # Usa SEMPRE o Python da venv para garantir que as libs estejam disponíveis
-        candidatos_venv = [
-            os.path.join(pasta, "venv", "bin", "python3"),
-            os.path.join(pasta, "venv", "bin", "python"),
-            os.path.join(pasta, "venv", "Scripts", "python.exe"),
-        ]
-        python_exec = next((c for c in candidatos_venv if os.path.isfile(c)), sys.executable)
-
-        # Encerra sessão screen antiga com o mesmo nome, se existir
-        os.system(f"screen -S {SCREEN_NAME} -X quit > /dev/null 2>&1")
-
-        cmd = (
-            f"screen -dmS {SCREEN_NAME} "
-            f"bash -c 'cd {pasta} && {python_exec} {script_path} --no-screen; exec bash'"
-        )
-        ret = os.system(cmd)
-
-        if ret == 0:
-            print(f"\n{VERDE}✅ Bot iniciado em segundo plano na sessão screen '{SCREEN_NAME}'!{RESET}")
-            print(f"\n{AZUL}{NEGRITO}  Para retornar à sessão:{RESET}")
-            print(f"  {VERDE}screen -r {SCREEN_NAME}{RESET}")
-            print(f"\n{AZUL}{NEGRITO}  Para sair sem encerrar o bot:{RESET}")
-            print(f"  {VERDE}Ctrl+A depois D{RESET}\n")
-        else:
-            print(f"\n{AMARELO}⚠️  Falha ao criar sessão screen. Rodando em primeiro plano.{RESET}\n")
-            return
-
-        sys.exit(0)
-    else:
-        print(f"\n  {VERDE}▶ Rodando em primeiro plano...{RESET}\n")
-
-_perguntar_segundo_plano()
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 🟢 IMPORTS PRINCIPAIS (só chegam aqui se venv, config.json e screen estão OK)
+# 🟢 IMPORTS PRINCIPAIS
 # ══════════════════════════════════════════════════════════════════════════════
 import json
 import time
@@ -225,7 +167,13 @@ logger.info(f"🔧 Prefixo carregado: '{PREFIXO}'")
 # ══════════════════════════════════════════════════════════════════════════════
 # 🟢 AUTENTICAÇÃO GOOGLE DRIVE (opcional)
 # ══════════════════════════════════════════════════════════════════════════════
-if _DRIVE_DISPONIVEL and config.get("DRIVE_ATIVO", False):
+# Ativa Drive automaticamente se: pydrive2 instalado + credenciais existem + pasta configurada
+_drive_configurado = (
+    config.get("ID_PASTA_RAIZ_DRIVE")
+    and os.path.exists("meu_drive.json")
+)
+
+if _DRIVE_DISPONIVEL and _drive_configurado:
     try:
         gauth = GoogleAuth()
         gauth.LoadCredentialsFile("meu_drive.json")
@@ -240,11 +188,10 @@ if _DRIVE_DISPONIVEL and config.get("DRIVE_ATIVO", False):
         logger.info("✅ Google Drive conectado.")
     except Exception as e:
         logger.error(f"❌ Falha ao conectar Drive: {e}")
+elif _drive_configurado and not _DRIVE_DISPONIVEL:
+    logger.warning("⚠️ pydrive2 não instalado. Instale com: pip install pydrive2")
 else:
-    if config.get("DRIVE_ATIVO", False):
-        logger.warning("⚠️ pydrive2 não instalado. Google Drive desativado.")
-    else:
-        logger.info("ℹ️  Google Drive não configurado (opcional).")
+    logger.info("ℹ️  Google Drive não configurado (opcional).")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 🟢 INICIALIZAÇÃO DO CLIENTE PYROGRAM
@@ -260,12 +207,12 @@ app = Client(
     plugins=dict(root="plugins")
 )
 
-app.config      = config
-app.drive       = drive
+app.config       = config
+app.drive        = drive
 app.tempo_inicio = time.time()
-app.PREFIXO     = PREFIXO
-app.VERSAO      = __VERSAO__
-app.UPDATE_FLAG = UPDATE_FLAG
+app.PREFIXO      = PREFIXO
+app.VERSAO       = __VERSAO__
+app.UPDATE_FLAG  = UPDATE_FLAG
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 🟢 TRATAMENTO SILENCIOSO DE ERROS COMUNS
@@ -283,14 +230,9 @@ async def iniciar():
     logger.info(f"🚀 INICIANDO USERBOT PRO v{__VERSAO__}...")
     await app.start()
 
-    # Monta texto de status do screen para o canal de logs
-    em_screen = _ja_esta_em_screen()
-    if em_screen:
-        screen_info = (
-            f"\n🖥️ **Rodando em segundo plano** (screen)\n"
-            f"↩️ Para retornar: `screen -r {SCREEN_NAME}`\n"
-            f"🔇 Para sair sem parar: `Ctrl+A` depois `D`"
-        )
+    em_background = "--background" in sys.argv or _ja_esta_em_screen()
+    if em_background:
+        screen_info = "\n🖥️ Rodando em **segundo plano**"
     else:
         screen_info = "\n🖥️ Rodando em **primeiro plano** (terminal aberto)"
 
@@ -345,4 +287,7 @@ if __name__ == "__main__":
         loop.set_exception_handler(manipulador_erros)
         loop.run_until_complete(iniciar())
     except KeyboardInterrupt:
-        logger.info("👋 Encerrado pelo usuário (Ctrl+C).")
+        logger.info("👋 Encerrado pelo usuário.")
+    except Exception as e:
+        logger.error(f"❌ Erro fatal: {e}")
+        sys.exit(1)
