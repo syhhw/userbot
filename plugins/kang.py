@@ -1,16 +1,15 @@
 """
 plugins/kang.py
-Comando ,kang — Rouba figurinhas (estáticas, animadas e vídeo) e adiciona ao pacote do usuário.
+Comando ,kang — Rouba figurinhas e adiciona automaticamente ao pacote do usuário.
 
 Dependência extra necessária na VM:
     pip install pyromod
 
-Lógica 100% automática:
-  - Usa pyromod (client.listen) para aguardar respostas do @Stickers bot
-  - Verifica existência do pack via API Pyrogram raw (GetStickerSet)
-  - Detecta figurinha estática, animada (.tgs) e vídeo (.webm)
-  - Cria o pacote automaticamente se não existir
-  - Troca de pacote automaticamente quando o atual estiver cheio (120 figurinhas)
+Fluxo de criação (pacote novo):
+    /newpack → título → figurinha → emoji → /publish → /skip → nome_do_pack
+
+Fluxo de adição (pacote existente):
+    /addsticker → nome_do_pack → figurinha → emoji → /done
 """
 import os
 import math
@@ -32,7 +31,7 @@ TMP_PNG  = "/tmp/kang_temp.png"
 # ─── Utilitários ──────────────────────────────────────────────────────────────
 
 async def pack_exists(client, packname: str) -> bool:
-    """Verifica se o pacote existe via API Pyrogram raw (confiável)."""
+    """Verifica se o pacote existe via API Pyrogram raw."""
     try:
         await client.invoke(
             raw.functions.messages.GetStickerSet(
@@ -92,7 +91,7 @@ async def cmd_kang(client, message):
     me = await client.get_me()
     username = me.username or str(me.id)
 
-    # ── Detecta tipo, emoji e baixa o arquivo ─────────────────────────────────
+    # ── Detecta tipo e emoji ───────────────────────────────────────────────────
     is_anim  = False
     is_video = False
     emoji    = "⭐"
@@ -103,27 +102,22 @@ async def cmd_kang(client, message):
             is_anim  = reply.sticker.is_animated
             is_video = reply.sticker.is_video
             emoji    = reply.sticker.emoji or "⭐"
-
             if not is_anim and not is_video:
                 await client.download_media(reply, file_name=TMP_WEBP)
                 file_to_send = await resize_image(TMP_WEBP, TMP_PNG)
-
         elif reply.photo:
             tmp = await client.download_media(reply, file_name=TMP_WEBP)
             file_to_send = await resize_image(tmp, TMP_PNG)
-
         elif reply.document and reply.document.mime_type and "image" in reply.document.mime_type:
             tmp = await client.download_media(reply, file_name=TMP_WEBP)
             file_to_send = await resize_image(tmp, TMP_PNG)
-
         else:
             return await message.edit_text("❌ Tipo de arquivo não suportado para kang.")
-
     except Exception as e:
         limpar_tmp()
         return await message.edit_text(f"❌ Erro ao processar arquivo: `{e}`")
 
-    # ── Lê argumentos ─────────────────────────────────────────────────────────
+    # ── Lê emoji personalizado do argumento ───────────────────────────────────
     partes = message.text.split(None, 1)
     pack_num = 1
     if len(partes) > 1:
@@ -137,15 +131,15 @@ async def cmd_kang(client, message):
     def build_names(num):
         if is_anim:
             pname = f"a{me.id}_by_{username}_{num}_anim"
-            pnick = f"@{username}'s animated pack {num}"
+            pnick = f"@{username} animated pack {num}"
             cmd   = "/newanimated"
         elif is_video:
             pname = f"a{me.id}_by_{username}_{num}_vid"
-            pnick = f"@{username}'s video pack {num}"
+            pnick = f"@{username} video pack {num}"
             cmd   = "/newvideo"
         else:
             pname = f"a{me.id}_by_{username}_{num}"
-            pnick = f"@{username}'s userbot pack {num}"
+            pnick = f"@{username} userbot pack {num}"
             cmd   = "/newpack"
         return pname, pnick, cmd
 
@@ -155,12 +149,12 @@ async def cmd_kang(client, message):
     # ── Helpers de conversa com @Stickers ─────────────────────────────────────
     bot_id = (await client.get_users(STICKER_BOT)).id
 
-    async def sw(text: str, timeout: int = 25):
-        """Envia mensagem ao @Stickers e aguarda resposta via pyromod."""
+    async def sw(text: str, timeout: int = 30):
+        """Envia mensagem ao @Stickers e aguarda resposta."""
         await client.send_message(STICKER_BOT, text)
         return await client.listen(chat_id=bot_id, timeout=timeout)
 
-    async def fw(timeout: int = 25):
+    async def fw(timeout: int = 30):
         """Envia a figurinha ao @Stickers e aguarda resposta."""
         if is_anim or is_video:
             await client.forward_messages(STICKER_BOT, message.chat.id, reply.id)
@@ -168,64 +162,72 @@ async def cmd_kang(client, message):
             await client.send_document(STICKER_BOT, file_to_send, force_document=True)
         return await client.listen(chat_id=bot_id, timeout=timeout)
 
-    # ── Fluxo principal ───────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
+    # FLUXO CORRETO DO @Stickers bot:
+    #
+    # CRIAÇÃO:
+    #   /newpack → (bot pede título) → título
+    #   → (bot pede figurinha) → envia figurinha
+    #   → (bot pede emoji) → emoji
+    #   → (bot diz "Congratulations, send /publish") → /publish
+    #   → (bot pede ícone ou /skip) → /skip
+    #   → (bot pede nome curto) → nome_do_pack
+    #   → PRONTO ✅
+    #
+    # ADIÇÃO:
+    #   /addsticker → (bot pede nome do pack) → nome_do_pack
+    #   → (bot pede figurinha) → envia figurinha
+    #   → (bot pede emoji) → emoji
+    #   → (bot diz "send /done") → /done
+    #   → PRONTO ✅
+    # ─────────────────────────────────────────────────────────────────────────
+
     try:
-        if await pack_exists(client, packname):
-            # Pacote existe → tenta adicionar
-            await sw("/addsticker")
+        exists = await pack_exists(client, packname)
+
+        if exists:
+            # ── Adiciona ao pacote existente ──────────────────────────────────
+            resp = await sw("/addsticker")
             resp = await sw(packname)
 
-            # Pacote cheio → incrementa automaticamente
-            while resp and PACK_FULL_MSG in (resp.text or ""):
+            # Pacote cheio → incrementa e cria novo
+            while PACK_FULL_MSG in (resp.text or ""):
                 pack_num += 1
                 packname, packnick, cmd_new = build_names(pack_num)
                 pack_url = f"https://t.me/addstickers/{packname}"
-                await message.edit_text(f"📦 Pack cheio! Criando pack **{pack_num}**...")
+                await message.edit_text(f"📦 Pack cheio! Criando pack **#{pack_num}**...")
 
                 if await pack_exists(client, packname):
+                    # Próximo pack também existe, tenta adicionar nele
                     resp = await sw(packname)
                 else:
-                    # Novo número não existe → cria
-                    await sw(cmd_new)
-                    await sw(packnick)
-                    await fw()
-                    await sw(emoji)
-                    await sw("/publish")
-                    if is_anim or is_video:
-                        await sw(f"<{packnick}>")
-                        await sw("/skip")
-                    await sw(packname)
+                    # Cria o próximo pack do zero
+                    resp = await sw(cmd_new)          # /newpack
+                    resp = await sw(packnick)          # título
+                    resp = await fw()                  # figurinha
+                    resp = await sw(emoji)             # emoji
+                    resp = await sw("/publish")        # /publish
+                    await sw("/skip")                  # /skip (ícone)
+                    await sw(packname)                 # nome curto
                     resp = None
                     break
 
-            # Pack aceitou → envia a figurinha
-            if resp and "Invalid pack selected." in (resp.text or ""):
-                await sw(cmd_new)
-                await sw(packnick)
-                await fw()
-                await sw(emoji)
-                await sw("/publish")
-                if is_anim or is_video:
-                    await sw(f"<{packnick}>")
-                    await sw("/skip")
-                await sw(packname)
-            elif resp and PACK_FULL_MSG not in (resp.text or ""):
-                await fw()
-                await sw(emoji)
-                await sw("/done")
+            # Pack aceitou a figurinha normalmente
+            if resp is not None:
+                resp = await fw()                      # figurinha
+                resp = await sw(emoji)                 # emoji
+                await sw("/done")                      # /done
 
         else:
-            # Pacote não existe → cria do zero
-            await message.edit_text("📦 Criando novo pacote de figurinhas...")
-            await sw(cmd_new)
-            await sw(packnick)
-            await fw()
-            await sw(emoji)
-            await sw("/publish")
-            if is_anim or is_video:
-                await sw(f"<{packnick}>")
-                await sw("/skip")
-            await sw(packname)
+            # ── Cria o pacote do zero ─────────────────────────────────────────
+            await message.edit_text("📦 **Criando novo pacote...**")
+            await sw(cmd_new)                          # /newpack
+            await sw(packnick)                         # título
+            await fw()                                 # figurinha
+            await sw(emoji)                            # emoji
+            await sw("/publish")                       # /publish
+            await sw("/skip")                          # /skip (pula ícone)
+            await sw(packname)                         # nome curto
 
         # ── Sucesso ───────────────────────────────────────────────────────────
         limpar_tmp()
@@ -234,9 +236,9 @@ async def cmd_kang(client, message):
             f"✅ **Figurinha roubada!**\n\n"
             f"🎭 Tipo: `{tipo}`\n"
             f"😀 Emoji: `{emoji}`\n"
-            f"📦 Pack: `{packname}`",
+            f"📦 Pack: [{packname}]({pack_url})",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("📦 Abrir pacote", url=pack_url)]
+                [InlineKeyboardButton("📦 Ver pacote", url=pack_url)]
             ]),
             disable_web_page_preview=True
         )
@@ -256,7 +258,7 @@ async def cmd_kang(client, message):
 
 @Client.on_message(cmd_filter("packinfo") & filters.me)
 async def cmd_packinfo(client, message):
-    """Exibe o link dos seus pacotes de figurinhas detectados via API."""
+    """Exibe o link dos seus pacotes de figurinhas."""
     me = await client.get_me()
     username = me.username or str(me.id)
     p = prefixo(client)
