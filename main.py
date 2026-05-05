@@ -131,10 +131,16 @@ def _perguntar_segundo_plano():
     resp = input(f"  ❓ Rodar em segundo plano? (S/n): ").strip().lower()
 
     if resp in ("", "s"):
-        # Monta o comando para relançar dentro do screen
-        python_exec = sys.executable
         script_path = os.path.abspath(sys.argv[0])
         pasta       = os.path.dirname(script_path)
+
+        # Usa SEMPRE o Python da venv para garantir que as libs estejam disponíveis
+        candidatos_venv = [
+            os.path.join(pasta, "venv", "bin", "python3"),
+            os.path.join(pasta, "venv", "bin", "python"),
+            os.path.join(pasta, "venv", "Scripts", "python.exe"),
+        ]
+        python_exec = next((c for c in candidatos_venv if os.path.isfile(c)), sys.executable)
 
         # Encerra sessão screen antiga com o mesmo nome, se existir
         os.system(f"screen -S {SCREEN_NAME} -X quit > /dev/null 2>&1")
