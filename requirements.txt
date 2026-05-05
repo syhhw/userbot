@@ -1,0 +1,11 @@
+pyrogram>=2.0.106
+tgcrypto
+PyDrive2
+requests
+humanize
+speedtest-cli
+Pillow
+gTTS
+deep-translator
+psutil
+pyromod
