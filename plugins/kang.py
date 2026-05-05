@@ -1,17 +1,17 @@
 """
 plugins/kang.py
-Comando ,kang — Rouba figurinhas (estáticas e animadas) e adiciona ao pacote do usuário.
+Comando ,kang — Rouba figurinhas (estáticas, animadas e vídeo) e adiciona ao pacote do usuário.
 
 Lógica 100% automática (sem interação manual):
   1. Verifica se o pacote já existe acessando t.me/addstickers/{packname}
-  2. Se existir → /addsticker → envia nome do pack → envia figurinha → emoji → /done
-     - Se o pacote estiver CHEIO (120) → incrementa número do pack e cria um novo automaticamente
-     - Se o pack não existir nesse número → cria um novo automaticamente
+  2. Se existir → /addsticker → nome do pack → figurinha → emoji → /done
+     - Se o pacote estiver CHEIO (120) → incrementa número e cria novo automaticamente
   3. Se não existir → /newpack ou /newanimated → título → figurinha → emoji → /publish → nome
 
 Baseado na implementação clássica dos userbots Telegram-Paperplane e UserBot.
 """
 import io
+import os
 import math
 import urllib.request
 
@@ -22,11 +22,12 @@ from utils.helpers import cmd_filter, prefixo
 
 STICKER_BOT = "Stickers"
 PACK_FULL_MSG = "Whoa! That's probably enough stickers for one pack"
+TMP_FILE = "/tmp/kang_sticker_temp"
 
 
-async def resize_image(photo_bytes: io.BytesIO) -> io.BytesIO:
-    """Redimensiona a imagem para 512x512 mantendo proporção, salva como PNG."""
-    image = Image.open(photo_bytes)
+async def resize_image(path: str) -> str:
+    """Redimensiona a imagem para 512x512 mantendo proporção e salva como PNG."""
+    image = Image.open(path)
     maxsize = (512, 512)
     if image.width < 512 and image.height < 512:
         if image.width > image.height:
@@ -38,11 +39,9 @@ async def resize_image(photo_bytes: io.BytesIO) -> io.BytesIO:
         image = image.resize(new_size)
     else:
         image.thumbnail(maxsize)
-    output = io.BytesIO()
-    output.name = "sticker.png"
-    image.save(output, "PNG")
-    output.seek(0)
-    return output
+    out_path = TMP_FILE + ".png"
+    image.save(out_path, "PNG")
+    return out_path
 
 
 def pack_exists(packname: str) -> bool:
@@ -54,6 +53,17 @@ def pack_exists(packname: str) -> bool:
         return "A <strong>Telegram</strong> user has created the <strong>Sticker&nbsp;Set</strong>." in html
     except:
         return False
+
+
+def limpar_tmp():
+    """Remove arquivos temporários do kang."""
+    for ext in [".png", ".webp", ".tgs", ".webm", ""]:
+        path = TMP_FILE + ext
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+            except:
+                pass
 
 
 @Client.on_message(cmd_filter("kang") & filters.me)
@@ -80,39 +90,42 @@ async def cmd_kang(client, message):
     is_anim = False
     is_video = False
     emoji = "⭐"
-    photo = None
+    file_path = None
 
-    if reply.sticker:
-        sticker = reply.sticker
-        is_anim = sticker.is_animated
-        is_video = sticker.is_video
-        emoji = sticker.emoji or "⭐"
-        if is_anim or is_video:
-            photo = None  # Será encaminhado diretamente
+    try:
+        if reply.sticker:
+            sticker = reply.sticker
+            is_anim = sticker.is_animated
+            is_video = sticker.is_video
+            emoji = sticker.emoji or "⭐"
+
+            if not is_anim and not is_video:
+                # Figurinha estática: baixa e redimensiona
+                raw_path = await client.download_media(reply, file_name=TMP_FILE + ".webp")
+                file_path = await resize_image(raw_path)
+            # Animadas e vídeo serão encaminhadas diretamente
+
+        elif reply.photo:
+            raw_path = await client.download_media(reply, file_name=TMP_FILE + ".jpg")
+            file_path = await resize_image(raw_path)
+
+        elif reply.document and reply.document.mime_type and "image" in reply.document.mime_type:
+            raw_path = await client.download_media(reply, file_name=TMP_FILE + ".jpg")
+            file_path = await resize_image(raw_path)
+
         else:
-            raw = io.BytesIO()
-            await client.download_media(reply, file_name=raw)
-            raw.seek(0)
-            photo = raw
-    elif reply.photo:
-        raw = io.BytesIO()
-        await client.download_media(reply, file_name=raw)
-        raw.seek(0)
-        photo = raw
-    elif reply.document and reply.document.mime_type and "image" in reply.document.mime_type:
-        raw = io.BytesIO()
-        await client.download_media(reply, file_name=raw)
-        raw.seek(0)
-        photo = raw
-    else:
-        return await message.edit_text("❌ Tipo de arquivo não suportado para kang.")
+            return await message.edit_text("❌ Tipo de arquivo não suportado para kang.")
+
+    except Exception as e:
+        limpar_tmp()
+        return await message.edit_text(f"❌ Erro ao baixar/processar arquivo: `{e}`")
 
     # Emoji personalizado passado como argumento
     partes = message.text.split(None, 1)
     if len(partes) > 1 and not partes[1].strip().isnumeric():
         emoji = partes[1].strip()
 
-    # Número do pacote (padrão 1, pode ser passado como argumento)
+    # Número do pacote (padrão 1, pode ser passado como argumento numérico)
     pack_num = 1
     if len(partes) > 1 and partes[1].strip().isnumeric():
         pack_num = int(partes[1].strip())
@@ -131,15 +144,15 @@ async def cmd_kang(client, message):
         packnick = f"@{username}'s userbot pack {pack_num}"
         cmd_new = "/newpack"
 
-    # Redimensiona imagem estática
-    file = None
-    if not is_anim and not is_video and photo:
-        try:
-            file = await resize_image(photo)
-        except Exception as e:
-            return await message.edit_text(f"❌ Erro ao processar imagem: `{e}`")
-
     pack_url = f"https://t.me/addstickers/{packname}"
+
+    async def enviar_figurinha(conv):
+        """Envia a figurinha correta para o @Stickers dentro de uma conversa."""
+        if is_anim or is_video:
+            await client.forward_messages(STICKER_BOT, reply.id, message.chat.id)
+        else:
+            await conv.send_file(file_path, force_document=True)
+        await conv.get_response()
 
     try:
         async with client.conversation(STICKER_BOT, timeout=30) as conv:
@@ -152,7 +165,7 @@ async def cmd_kang(client, message):
                 await conv.send_message(packname)
                 resp = await conv.get_response()
 
-                # Pacote cheio → incrementa automaticamente até achar um com espaço
+                # Pacote cheio → incrementa automaticamente
                 while PACK_FULL_MSG in (resp.text or ""):
                     pack_num += 1
                     if is_anim:
@@ -167,79 +180,55 @@ async def cmd_kang(client, message):
                     pack_url = f"https://t.me/addstickers/{packname}"
 
                     await message.edit_text(
-                        f"📦 Pack {pack_num - 1} cheio! Mudando para pack **{pack_num}**..."
+                        f"📦 Pack {pack_num - 1} cheio! Criando pack **{pack_num}**..."
                     )
 
                     if pack_exists(packname):
                         await conv.send_message(packname)
                         resp = await conv.get_response()
                     else:
-                        # Novo número de pack não existe ainda → cria
+                        # Novo número ainda não existe → cria
                         await conv.send_message(cmd_new)
                         await conv.get_response()
                         await conv.send_message(packnick)
                         await conv.get_response()
-
-                        if is_anim or is_video:
-                            await client.forward_messages(STICKER_BOT, reply.id, message.chat.id)
-                        else:
-                            file.seek(0)
-                            await conv.send_file(file, force_document=True)
-                        await conv.get_response()
-
+                        await enviar_figurinha(conv)
                         await conv.send_message(emoji)
                         await conv.get_response()
                         await conv.send_message("/publish")
-
                         if is_anim or is_video:
                             await conv.get_response()
                             await conv.send_message(f"<{packnick}>")
                             await conv.get_response()
                             await conv.send_message("/skip")
                             await conv.get_response()
-
                         await conv.send_message(packname)
                         await conv.get_response()
                         break
 
-                # Se o pack ainda aceitou (resp não é "pack cheio")
+                # Pack aceitou (não estava cheio)
                 if PACK_FULL_MSG not in (resp.text or ""):
                     if resp.text and "Invalid pack selected." in resp.text:
-                        # Pack não existe mais → cria do zero
+                        # Pack sumiu → cria do zero
                         await conv.send_message(cmd_new)
                         await conv.get_response()
                         await conv.send_message(packnick)
                         await conv.get_response()
-
-                        if is_anim or is_video:
-                            await client.forward_messages(STICKER_BOT, reply.id, message.chat.id)
-                        else:
-                            file.seek(0)
-                            await conv.send_file(file, force_document=True)
-                        await conv.get_response()
-
+                        await enviar_figurinha(conv)
                         await conv.send_message(emoji)
                         await conv.get_response()
                         await conv.send_message("/publish")
-
                         if is_anim or is_video:
                             await conv.get_response()
                             await conv.send_message(f"<{packnick}>")
                             await conv.get_response()
                             await conv.send_message("/skip")
                             await conv.get_response()
-
                         await conv.send_message(packname)
                         await conv.get_response()
                     else:
-                        # Pack existe e tem espaço → envia figurinha
-                        if is_anim or is_video:
-                            await client.forward_messages(STICKER_BOT, reply.id, message.chat.id)
-                        else:
-                            file.seek(0)
-                            await conv.send_file(file, force_document=True)
-                        await conv.get_response()
-
+                        # Pack existe e tem espaço → envia figurinha normalmente
+                        await enviar_figurinha(conv)
                         await conv.send_message(emoji)
                         await conv.get_response()
                         await conv.send_message("/done")
@@ -248,35 +237,25 @@ async def cmd_kang(client, message):
             else:
                 # ── Pacote não existe: cria do zero ────────────────────────────
                 await message.edit_text("📦 Criando novo pacote de figurinhas...")
-
                 await conv.send_message(cmd_new)
                 await conv.get_response()
-
                 await conv.send_message(packnick)
                 await conv.get_response()
-
-                if is_anim or is_video:
-                    await client.forward_messages(STICKER_BOT, reply.id, message.chat.id)
-                else:
-                    file.seek(0)
-                    await conv.send_file(file, force_document=True)
-                await conv.get_response()
-
+                await enviar_figurinha(conv)
                 await conv.send_message(emoji)
                 await conv.get_response()
                 await conv.send_message("/publish")
-
                 if is_anim or is_video:
                     await conv.get_response()
                     await conv.send_message(f"<{packnick}>")
                     await conv.get_response()
                     await conv.send_message("/skip")
                     await conv.get_response()
-
                 await conv.send_message(packname)
                 await conv.get_response()
 
         # ── Sucesso ────────────────────────────────────────────────────────────
+        limpar_tmp()
         tipo = "Animada 🎞️" if is_anim else ("Vídeo 🎬" if is_video else "Estática 🖼️")
         await message.edit_text(
             f"✅ **Figurinha roubada com sucesso!**\n\n"
@@ -291,6 +270,7 @@ async def cmd_kang(client, message):
         )
 
     except Exception as e:
+        limpar_tmp()
         await message.edit_text(
             f"❌ **Erro no kang:**\n`{e}`\n\n"
             f"💡 Certifique-se de que o bot @Stickers está acessível e tente novamente."
@@ -299,10 +279,12 @@ async def cmd_kang(client, message):
 
 @Client.on_message(cmd_filter("packinfo") & filters.me)
 async def cmd_packinfo(client, message):
-    """Exibe o link dos seus pacotes de figurinhas."""
+    """Exibe o link dos seus pacotes de figurinhas detectados automaticamente."""
     me = await client.get_me()
     username = me.username or str(me.id)
     p = prefixo(client)
+
+    await message.edit_text("🔍 **Buscando seus pacotes...**")
 
     txt = f"📦 **Seus pacotes de figurinhas** (`@{username}`):\n\n"
     encontrou = False
