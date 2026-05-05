@@ -1,0 +1,23 @@
+# Arquivos de Sessão do Telegram
+*.session
+*.session-journal
+
+# Configurações e Chaves (NUNCA ENVIAR PARA O GITHUB)
+config.json
+meu_drive.json
+client_secrets.json
+
+# Caches e Dados Locais
+admin_cache.json
+feds.json
+permitidos.json
+.update_pending.json
+__pycache__/
+*.pyc
+
+# Arquivos Temporários
+downloads/
+*.png
+*.ogg
+*.zip
+*.ttf
