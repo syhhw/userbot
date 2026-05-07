@@ -23,6 +23,7 @@ feds.json
 triggers.json
 .update_pending.json
 .deps_updated.json
+clone_backup.json
 
 # ─── Logs e Temporários ───
 *.log

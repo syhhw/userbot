@@ -1,5 +1,5 @@
 """
-🚀 USERBOT PRO v2.0 - setup.py
+🚀 USERBOT PRO v2.1 - setup.py
 Configurador interativo inteligente:
   - Detecta e ativa a venv automaticamente antes de qualquer verificação.
   - Instala dependências faltantes automaticamente dentro da venv.
@@ -70,7 +70,7 @@ _garantir_venv()
 # ══════════════════════════════════════════════════════════════════════════════
 def cabecalho():
     print(f"\n{AZUL}{NEGRITO}╔════════════════════════════════════════════╗{RESET}")
-    print(f"{AZUL}{NEGRITO}║   🚀 USERBOT PRO v2.0 - SETUP INTELIGENTE  ║{RESET}")
+    print(f"{AZUL}{NEGRITO}║   🚀 USERBOT PRO v2.1 - SETUP INTELIGENTE  ║{RESET}")
     print(f"{AZUL}{NEGRITO}╚════════════════════════════════════════════╝{RESET}\n")
     print(f"  {CIANO}Python:{RESET} {sys.executable}")
     print(f"  {CIANO}Venv ativa:{RESET} {VERDE}Sim ✅{RESET}\n")
@@ -106,7 +106,8 @@ def instalar_dependencias(faltando: list) -> bool:
             "gtts": "gTTS", "deep_translator": "deep-translator",
             "psutil": "psutil", "tgcrypto": "TgCrypto", "pyromod": "pyromod",
             "aiofiles": "aiofiles", "aiohttp": "aiohttp",
-            "google.generativeai": "google-generativeai"
+            "google.generativeai": "google-generativeai",
+            "yt_dlp": "yt-dlp"
         }
         for lib in faltando:
             pkg = pacotes_pip.get(lib, lib)
@@ -133,6 +134,7 @@ def verificar_bibliotecas() -> list:
         ("aiofiles",        "aiofiles"),
         ("aiohttp",         "aiohttp"),
         ("google.generativeai", "google-generativeai"),
+        ("yt_dlp",          "yt-dlp"),
     ]
     faltando = []
     for lib_import, lib_name in libs:

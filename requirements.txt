@@ -12,3 +12,4 @@ pyromod
 aiofiles
 aiohttp
 google-generativeai
+yt-dlp

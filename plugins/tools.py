@@ -1,6 +1,6 @@
 """
 plugins/tools.py
-Ferramentas e diversão: hack, type, ghost, fake, tr, voz, print, encurtar, ipinfo, clima, specs
+Ferramentas e diversão: hack, type, ghost, fake, tr, voz, print, encurtar, ipinfo, clima, specs, clone, reverter
 """
 import os
 import re
@@ -13,7 +13,7 @@ from gtts import gTTS
 from PIL import Image, ImageDraw, ImageFont
 from pyrogram import filters, enums, Client
 from deep_translator import GoogleTranslator
-from utils.helpers import cmd_filter, prefixo
+from utils.helpers import cmd_filter, prefixo, resolver_alvo, carregar, salvar
 
 
 @Client.on_message(cmd_filter("hack") & filters.me)
@@ -318,3 +318,87 @@ async def cmd_specs(client, message):
             )
     except Exception as e:
         await message.edit_text(f"❌ Erro: `{e}`")
+
+
+@Client.on_message(cmd_filter("clone") & filters.me)
+async def cmd_clone(client, message):
+    """Clona o nome, bio e foto de um usuário."""
+    user, _, _ = await resolver_alvo(client, message)
+    if not user:
+        return await message.edit_text(f"⚠️ Responda a alguém ou use `{prefixo(client)}clone @user`")
+        
+    msg = await message.edit_text("🎭 **Iniciando clonagem...**")
+    
+    backup = carregar("clone_backup.json", {})
+    if not backup.get("cloned"):
+        me = await client.get_me()
+        me_full = await client.get_chat("me")
+        backup = {
+            "cloned": True,
+            "first_name": me.first_name or "",
+            "last_name": me.last_name or "",
+            "bio": me_full.bio or "",
+            "photos_added": 0
+        }
+        salvar("clone_backup.json", backup)
+        
+    target = await client.get_users(user.id)
+    target_full = await client.get_chat(user.id)
+    
+    first = target.first_name or ""
+    last = target.last_name or ""
+    bio = target_full.bio[:70] if target_full.bio else ""
+    
+    try:
+        await client.update_profile(first_name=first, last_name=last, bio=bio)
+    except Exception as e:
+        return await msg.edit_text(f"❌ Erro ao atualizar perfil: `{e}`")
+        
+    if target.photo:
+        await msg.edit_text("🎭 **Baixando foto de perfil...**")
+        photo_path = None
+        try:
+            photo_path = await client.download_media(target.photo.big_file_id)
+            await client.set_profile_photo(photo=photo_path)
+            backup["photos_added"] = backup.get("photos_added", 0) + 1
+            salvar("clone_backup.json", backup)
+        except Exception:
+            pass
+        finally:
+            if photo_path and os.path.exists(photo_path):
+                os.remove(photo_path)
+                
+    await msg.edit_text(f"✅ **Clone de `{first}` ativado!**\nUse `{prefixo(client)}reverter` para voltar ao normal.")
+
+
+@Client.on_message(cmd_filter("reverter") & filters.me)
+async def cmd_reverter(client, message):
+    """Restaura o perfil original após um clone."""
+    backup = carregar("clone_backup.json", {})
+    if not backup.get("cloned"):
+        return await message.edit_text("⚠️ Você não está clonando ninguém no momento.")
+        
+    msg = await message.edit_text("🔄 **Revertendo para o perfil original...**")
+    
+    try:
+        await client.update_profile(
+            first_name=backup.get("first_name", ""),
+            last_name=backup.get("last_name", ""),
+            bio=backup.get("bio", "")
+        )
+    except Exception:
+        pass
+        
+    added = backup.get("photos_added", 0)
+    if added > 0:
+        try:
+            photos = []
+            async for p in client.get_chat_photos("me", limit=added):
+                photos.append(p.file_id)
+            if photos:
+                await client.delete_profile_photos(photos)
+        except Exception:
+            pass
+            
+    salvar("clone_backup.json", {})
+    await msg.edit_text("✅ **Perfil original restaurado com sucesso!**")

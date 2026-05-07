@@ -1,5 +1,5 @@
 """
-🚀 USERBOT PRO v2.0 - main.py
+🚀 USERBOT PRO v2.1 - main.py
 Núcleo central que carrega configurações, conecta ao Google Drive
 e inicializa o cliente Pyrogram com os plugins.
 
@@ -134,6 +134,7 @@ def _garantir_dependencias():
         ("aiofiles",            "aiofiles"),
         ("aiohttp",             "aiohttp"),
         ("google.generativeai", "google-generativeai"),
+        ("yt_dlp",              "yt-dlp"),
         ("pydrive2",            "PyDrive2")
     ]
     faltando = []
@@ -186,7 +187,7 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 # 🟢 IDENTIDADE DO PROJETO
 # ══════════════════════════════════════════════════════════════════════════════
-__VERSAO__ = "2.0"
+__VERSAO__ = "2.1"
 UPDATE_FLAG = ".update_pending.json"
 
 # ══════════════════════════════════════════════════════════════════════════════
