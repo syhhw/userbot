@@ -171,11 +171,15 @@ async def monitor_central(client, message):
             ext = os.path.splitext(nome)[1].lower()
             cat = CATEGORIAS.get(ext, 'Outros')
             path = await message.download()
-            from plugins.drive import obter_pasta
-            id_pasta = obter_pasta(client, cat)
-            f_drive = drive.CreateFile({'title': os.path.basename(path), 'parents': [{'id': id_pasta}]})
-            f_drive.SetContentFile(path)
-            f_drive.Upload()
+            
+            def upload_drive_sync():
+                from plugins.drive import obter_pasta
+                id_pasta = obter_pasta(client, cat)
+                f_drive = drive.CreateFile({'title': os.path.basename(path), 'parents': [{'id': id_pasta}]})
+                f_drive.SetContentFile(path)
+                f_drive.Upload()
+                
+            await asyncio.to_thread(upload_drive_sync)
             os.remove(path)
     except:
         pass

@@ -3,7 +3,8 @@ plugins/drive.py
 Comandos do Google Drive: status, organizar, get, direto, procurar, apagar
 """
 import os
-import requests
+import asyncio
+import aiohttp
 import humanize
 
 from pyrogram import filters, Client
@@ -53,10 +54,13 @@ async def drive_status(client, message):
     if not drive:
         return await message.edit_text("❌ Drive não conectado.")
     try:
-        sobre = drive.GetAbout()
-        total = int(sobre['quotaBytesTotal'])
-        usado = int(sobre['quotaBytesUsedAggregate'])
-        pct = (usado / total) * 100
+        def fetch_status():
+            return drive.GetAbout()
+            
+        sobre = await asyncio.to_thread(fetch_status)
+        total = int(sobre.get('quotaBytesTotal', 1))
+        usado = int(sobre.get('quotaBytesUsedAggregate', 0))
+        pct = (usado / total) * 100 if total > 0 else 0
         barras = "".join(["🟥" if i < int(pct // 10) else "🟩" for i in range(10)])
         await message.edit_text(
             f"📊 **Google Drive**\n\n"
@@ -69,22 +73,39 @@ async def drive_status(client, message):
 
 @Client.on_message(cmd_filter("organizar") & filters.me)
 async def drive_organizar(client, message):
-    """Organiza os arquivos do Drive em pastas por categoria."""
+    """Organiza os arquivos da pasta raiz do bot no Drive em subpastas por categoria."""
     drive = getattr(client, "drive", None)
     if not drive:
         return await message.edit_text("❌ Drive não conectado.")
     msg = await message.edit_text("🗂️ **Organizando arquivos...**")
     try:
-        arquivos = drive.ListFile({'q': "trashed=false and mimeType != 'application/vnd.google-apps.folder'"}).GetList()
-        movidos = 0
-        for arq in arquivos:
-            ext = os.path.splitext(arq['title'])[1].lower()
-            categoria = CATEGORIAS.get(ext, 'Outros')
-            id_destino = obter_pasta(client, categoria)
-            arq['parents'] = [{'id': id_destino}]
-            arq.Upload()
-            movidos += 1
-        await msg.edit_text(f"✅ **Organização concluída!**\n📦 `{movidos}` arquivos movidos.")
+        def do_organize():
+            cfg = getattr(client, "config", {})
+            raiz = cfg.get("ID_PASTA_RAIZ_DRIVE")
+            if not raiz:
+                raise ValueError("ID da pasta raiz não configurado.")
+            
+            query = f"'{raiz}' in parents and trashed=false and mimeType != 'application/vnd.google-apps.folder'"
+            arquivos = drive.ListFile({'q': query}).GetList()
+            movidos = 0
+            for arq in arquivos:
+                ext = os.path.splitext(arq['title'])[1].lower()
+                categoria = CATEGORIAS.get(ext, 'Outros')
+                id_destino = obter_pasta(client, categoria)
+                
+                # Move o arquivo removendo as pastas pai anteriores (PyDrive API wrapper)
+                old_parents = ",".join([p['id'] for p in arq.get('parents', [])])
+                drive.auth.service.files().update(
+                    fileId=arq['id'],
+                    addParents=id_destino,
+                    removeParents=old_parents,
+                    fields='id, parents'
+                ).execute()
+                movidos += 1
+            return movidos
+            
+        movidos = await asyncio.to_thread(do_organize)
+        await msg.edit_text(f"✅ **Organização concluída!**\n📦 `{movidos}` arquivos movidos da raiz para subpastas.")
     except Exception as e:
         await msg.edit_text(f"❌ Erro: `{e}`")
 
@@ -103,18 +124,27 @@ async def drive_get(client, message):
     try:
         nome = url.split("/")[-1].split("?")[0] or "arquivo"
         local = os.path.join("/tmp", nome)
-        with requests.get(url, stream=True, timeout=60) as r:
-            r.raise_for_status()
-            with open(local, "wb") as f:
-                for chunk in r.iter_content(chunk_size=1024 * 1024):
-                    f.write(chunk)
-        ext = os.path.splitext(nome)[1].lower()
-        categoria = CATEGORIAS.get(ext, 'Outros')
-        id_pasta = obter_pasta(client, categoria)
-        f_drive = drive.CreateFile({'title': nome, 'parents': [{'id': id_pasta}]})
-        f_drive.SetContentFile(local)
-        f_drive.Upload()
-        f_drive.InsertPermission({'type': 'anyone', 'value': 'anyone', 'role': 'reader'})
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as r:
+                r.raise_for_status()
+                with open(local, "wb") as f:
+                    async for chunk in r.content.iter_chunked(1024 * 1024):
+                        f.write(chunk)
+                        
+        await msg.edit_text("☁️ **Enviando para o Google Drive...**")
+        
+        def do_upload():
+            ext = os.path.splitext(nome)[1].lower()
+            categoria = CATEGORIAS.get(ext, 'Outros')
+            id_pasta = obter_pasta(client, categoria)
+            f_drive = drive.CreateFile({'title': nome, 'parents': [{'id': id_pasta}]})
+            f_drive.SetContentFile(local)
+            f_drive.Upload()
+            f_drive.InsertPermission({'type': 'anyone', 'value': 'anyone', 'role': 'reader'})
+            return f_drive, categoria
+            
+        f_drive, categoria = await asyncio.to_thread(do_upload)
         os.remove(local)
         await msg.edit_text(
             f"✅ **Upload concluído!**\n"
@@ -136,7 +166,10 @@ async def drive_direto(client, message):
         return await message.edit_text(f"⚠️ Use: `{prefixo(client)}direto [nome do arquivo]`")
     termo = partes[1].strip()
     try:
-        arquivos = drive.ListFile({'q': f"title = '{termo}' and trashed=false"}).GetList()
+        def do_search():
+            return drive.ListFile({'q': f"title = '{termo}' and trashed=false"}).GetList()
+            
+        arquivos = await asyncio.to_thread(do_search)
         if not arquivos:
             return await message.edit_text("❌ Arquivo não encontrado.")
         f = arquivos[0]
@@ -159,7 +192,10 @@ async def drive_procurar(client, message):
     termo = partes[1].strip()
     await message.edit_text(f"🔎 **Procurando:** `{termo}`...")
     try:
-        arquivos = drive.ListFile({'q': f"title contains '{termo}' and trashed=false"}).GetList()
+        def do_search():
+            return drive.ListFile({'q': f"title contains '{termo}' and trashed=false"}).GetList()
+            
+        arquivos = await asyncio.to_thread(do_search)
         if not arquivos:
             return await message.edit_text("❌ Nenhum arquivo encontrado.")
         global ULTIMA_BUSCA
@@ -191,8 +227,10 @@ async def drive_apagar(client, message):
         return await message.edit_text("❌ Número inválido. Faça uma busca primeiro.")
     item = ULTIMA_BUSCA[num]
     try:
-        f = drive.CreateFile({'id': item['id']})
-        f.Trash()
+        def do_trash():
+            f = drive.CreateFile({'id': item['id']})
+            f.Trash()
+        await asyncio.to_thread(do_trash)
         await message.edit_text(f"🗑️ **Movido para a lixeira:**\n📁 `{item['title']}`")
         del ULTIMA_BUSCA[num]
     except Exception as e:
