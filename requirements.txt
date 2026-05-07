@@ -9,3 +9,6 @@ gTTS
 deep-translator
 psutil
 pyromod
+aiofiles
+aiohttp
+google-generativeai

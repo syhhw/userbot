@@ -23,6 +23,7 @@ import sys
 AMARELO = "\033[93m"
 VERDE   = "\033[92m"
 AZUL    = "\033[94m"
+VERMELHO = "\033[91m"
 NEGRITO = "\033[1m"
 RESET   = "\033[0m"
 
@@ -108,6 +109,54 @@ def _verificar_primeiro_uso():
             sys.exit(0)
 
 _verificar_primeiro_uso()
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 🟡 BLOCO 3 — DETECÇÃO AUTOMÁTICA E AUTO-REPAIR DE DEPENDÊNCIAS
+# ══════════════════════════════════════════════════════════════════════════════
+def _garantir_dependencias():
+    import importlib
+    import subprocess
+    import sys
+    import os
+    import json
+
+    libs = [
+        ("pyrogram",            "pyrogram>=2.0.106"),
+        ("requests",            "requests"),
+        ("humanize",            "humanize"),
+        ("speedtest",           "speedtest-cli"),
+        ("PIL",                 "Pillow"),
+        ("gtts",                "gTTS"),
+        ("deep_translator",     "deep-translator"),
+        ("psutil",              "psutil"),
+        ("tgcrypto",            "TgCrypto"),
+        ("pyromod",             "pyromod"),
+        ("aiofiles",            "aiofiles"),
+        ("aiohttp",             "aiohttp"),
+        ("google.generativeai", "google-generativeai"),
+        ("pydrive2",            "PyDrive2")
+    ]
+    faltando = []
+    for lib_import, lib_name in libs:
+        try:
+            importlib.import_module(lib_import)
+        except ImportError:
+            faltando.append(lib_name)
+            
+    if faltando:
+        print(f"\n{AMARELO}⚠️  Dependências ausentes detectadas: {', '.join(faltando)}{RESET}")
+        print(f"{AZUL}▶  Baixando e instalando em background (isso pode levar alguns segundos)...{RESET}")
+        try:
+            subprocess.run([sys.executable, "-m", "pip", "install", *faltando, "-q"], check=True)
+            print(f"{VERDE}✅ Instalação concluída! Reiniciando o bot...{RESET}\n")
+            with open(".deps_updated.json", "w", encoding="utf-8") as f:
+                json.dump(faltando, f)
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+        except Exception as e:
+            print(f"{VERMELHO}❌ Falha crítica ao tentar instalar pacotes automaticamente: {e}{RESET}")
+            sys.exit(1)
+
+_garantir_dependencias()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 🟢 IMPORTS PRINCIPAIS
@@ -265,6 +314,22 @@ async def iniciar():
             finally:
                 try:
                     os.remove(UPDATE_FLAG)
+                except:
+                    pass
+        elif os.path.exists(".deps_updated.json"):
+            try:
+                with open(".deps_updated.json", "r", encoding="utf-8") as f:
+                    libs_instaladas = json.load(f)
+                lista_libs = "\n".join([f"📦 `{lib}`" for lib in libs_instaladas])
+                await app.send_message(
+                    config["ID_CANAL_LOGS"],
+                    f"🛠️ **AUTO-REPAIR DETECTADO:**\n\nDetectei que bibliotecas vitais estavam faltando e as instalei automaticamente antes de dar boot:\n{lista_libs}\n\n🚀 **Userbot v{__VERSAO__} ONLINE!**"
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ Falha ao notificar libs instaladas: {e}")
+            finally:
+                try:
+                    os.remove(".deps_updated.json")
                 except:
                     pass
         else:
