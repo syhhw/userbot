@@ -8,7 +8,7 @@ import aiohttp
 import humanize
 
 from pyrogram import filters, Client
-from utils.helpers import cmd_filter, prefixo, salvar, carregar, deletar_depois
+from utils.helpers import cmd_filter, prefixo, salvar, carregar, deletar_depois, tr
 
 CATEGORIAS = {
     '.apk': 'Apps', '.zip': 'Zips', '.rar': 'Zips', '.7z': 'Zips',
@@ -53,7 +53,7 @@ async def drive_status(client, message):
     deletar_depois(message, 15)
     drive = getattr(client, "drive", None)
     if not drive:
-        return await message.edit_text("❌ Drive não conectado.")
+        return await message.edit_text(tr(client, "❌ Drive não conectado.", "❌ Drive not connected."))
     try:
         def fetch_status():
             return drive.GetAbout()
@@ -69,7 +69,7 @@ async def drive_status(client, message):
             f"☁️ `{humanize.naturalsize(usado)}` / `{humanize.naturalsize(total)}`"
         )
     except Exception as e:
-        await message.edit_text(f"❌ Erro: `{e}`")
+        await message.edit_text(tr(client, f"❌ Erro: `{e}`", f"❌ Error: `{e}`"))
 
 
 @Client.on_message(cmd_filter("organizar") & filters.me)
@@ -77,8 +77,8 @@ async def drive_organizar(client, message):
     """Organiza os arquivos da pasta raiz do bot no Drive em subpastas por categoria."""
     drive = getattr(client, "drive", None)
     if not drive:
-        return await message.edit_text("❌ Drive não conectado.")
-    msg = await message.edit_text("🗂️ **Organizando arquivos...**")
+        return await message.edit_text(tr(client, "❌ Drive não conectado.", "❌ Drive not connected."))
+    msg = await message.edit_text(tr(client, "🗂️ **Organizando arquivos...**", "🗂️ **Organizing files...**"))
     try:
         def do_organize():
             cfg = getattr(client, "config", {})
@@ -106,9 +106,9 @@ async def drive_organizar(client, message):
             return movidos
             
         movidos = await asyncio.to_thread(do_organize)
-        await msg.edit_text(f"✅ **Organização concluída!**\n📦 `{movidos}` arquivos movidos da raiz para subpastas.")
+        await msg.edit_text(tr(client, f"✅ **Organização concluída!**\n📦 `{movidos}` arquivos movidos da raiz para subpastas.", f"✅ **Organization complete!**\n📦 `{movidos}` files moved from root to subfolders."))
     except Exception as e:
-        await msg.edit_text(f"❌ Erro: `{e}`")
+        await msg.edit_text(tr(client, f"❌ Erro: `{e}`", f"❌ Error: `{e}`"))
     deletar_depois(msg, 15)
 
 
@@ -117,12 +117,12 @@ async def drive_get(client, message):
     """Baixa um arquivo de uma URL e envia para o Drive."""
     drive = getattr(client, "drive", None)
     if not drive:
-        return await message.edit_text("❌ Drive não conectado.")
+        return await message.edit_text(tr(client, "❌ Drive não conectado.", "❌ Drive not connected."))
     partes = message.text.split(None, 1)
     if len(partes) < 2:
-        return await message.edit_text(f"⚠️ Use: `{prefixo(client)}get [URL]`")
+        return await message.edit_text(tr(client, f"⚠️ Use: `{prefixo(client)}get [URL]`", f"⚠️ Use: `{prefixo(client)}get [URL]`"))
     url = partes[1].strip()
-    msg = await message.edit_text("📥 **Baixando arquivo da URL...**")
+    msg = await message.edit_text(tr(client, "📥 **Baixando arquivo da URL...**", "📥 **Downloading file from URL...**"))
     try:
         nome = url.split("/")[-1].split("?")[0] or "arquivo"
         local = os.path.join("/tmp", nome)
@@ -134,7 +134,7 @@ async def drive_get(client, message):
                     async for chunk in r.content.iter_chunked(1024 * 1024):
                         f.write(chunk)
                         
-        await msg.edit_text("☁️ **Enviando para o Google Drive...**")
+        await msg.edit_text(tr(client, "☁️ **Enviando para o Google Drive...**", "☁️ **Uploading to Google Drive...**"))
         
         def do_upload():
             ext = os.path.splitext(nome)[1].lower()
@@ -148,14 +148,18 @@ async def drive_get(client, message):
             
         f_drive, categoria = await asyncio.to_thread(do_upload)
         os.remove(local)
-        await msg.edit_text(
+        await msg.edit_text(tr(client,
             f"✅ **Transferência Concluída!**\n"
             f"├ 📁 **Arquivo:** `{nome}`\n"
             f"├ 🗂️ **Categoria:** `{categoria}`\n"
-            f"└ 🔗 [Acessar no Google Drive]({f_drive['alternateLink']})"
-        )
+            f"└ 🔗 [Acessar no Google Drive]({f_drive['alternateLink']})",
+            f"✅ **Transfer Complete!**\n"
+            f"├ 📁 **File:** `{nome}`\n"
+            f"├ 🗂️ **Category:** `{categoria}`\n"
+            f"└ 🔗 [Access on Google Drive]({f_drive['alternateLink']})"
+        ))
     except Exception as e:
-        await msg.edit_text(f"❌ Erro: `{e}`")
+        await msg.edit_text(tr(client, f"❌ Erro: `{e}`", f"❌ Error: `{e}`"))
     deletar_depois(msg, 15)
 
 
@@ -165,10 +169,10 @@ async def drive_direto(client, message):
     deletar_depois(message, 20)
     drive = getattr(client, "drive", None)
     if not drive:
-        return await message.edit_text("❌ Drive não conectado.")
+        return await message.edit_text(tr(client, "❌ Drive não conectado.", "❌ Drive not connected."))
     partes = message.text.split(None, 1)
     if len(partes) < 2:
-        return await message.edit_text(f"⚠️ Use: `{prefixo(client)}direto [nome do arquivo]`")
+        return await message.edit_text(tr(client, f"⚠️ Use: `{prefixo(client)}direto [nome do arquivo]`", f"⚠️ Use: `{prefixo(client)}direct [file name]`"))
     termo = partes[1].strip()
     try:
         def do_search():
@@ -176,12 +180,12 @@ async def drive_direto(client, message):
             
         arquivos = await asyncio.to_thread(do_search)
         if not arquivos:
-            return await message.edit_text("❌ Arquivo não encontrado.")
+            return await message.edit_text(tr(client, "❌ Arquivo não encontrado.", "❌ File not found."))
         f = arquivos[0]
         link = f"https://drive.google.com/uc?export=download&id={f['id']}"
-        await message.edit_text(f"🔗 **Link Direto**\n\n📁 `{f['title']}`\n`{link}`")
+        await message.edit_text(tr(client, f"🔗 **Link Direto**\n\n📁 `{f['title']}`\n`{link}`", f"🔗 **Direct Link**\n\n📁 `{f['title']}`\n`{link}`"))
     except Exception as e:
-        await message.edit_text(f"❌ Erro: `{e}`")
+        await message.edit_text(tr(client, f"❌ Erro: `{e}`", f"❌ Error: `{e}`"))
 
 
 @Client.on_message(cmd_filter("procurar") & filters.me)
@@ -190,31 +194,31 @@ async def drive_procurar(client, message):
     deletar_depois(message, 30)
     drive = getattr(client, "drive", None)
     if not drive:
-        return await message.edit_text("❌ Drive não conectado.")
+        return await message.edit_text(tr(client, "❌ Drive não conectado.", "❌ Drive not connected."))
     p = prefixo(client)
     partes = message.text.split(None, 1)
     if len(partes) < 2:
-        return await message.edit_text(f"⚠️ Use: `{p}procurar [termo]`")
+        return await message.edit_text(tr(client, f"⚠️ Use: `{p}procurar [termo]`", f"⚠️ Use: `{p}search [term]`"))
     termo = partes[1].strip()
-    await message.edit_text(f"🔎 **Procurando:** `{termo}`...")
+    await message.edit_text(tr(client, f"🔎 **Procurando:** `{termo}`...", f"🔎 **Searching:** `{termo}`..."))
     try:
         def do_search():
             return drive.ListFile({'q': f"title contains '{termo}' and trashed=false"}).GetList()
             
         arquivos = await asyncio.to_thread(do_search)
         if not arquivos:
-            return await message.edit_text("❌ Nenhum arquivo encontrado.")
+            return await message.edit_text(tr(client, "❌ Nenhum arquivo encontrado.", "❌ No files found."))
         global ULTIMA_BUSCA
         ULTIMA_BUSCA = {}
-        txt = f"🔎 **Resultados para '{termo}':**\n\n"
+        txt = tr(client, f"🔎 **Resultados para '{termo}':**\n\n", f"🔎 **Results for '{termo}':**\n\n")
         for i, arq in enumerate(arquivos[:10], 1):
             ULTIMA_BUSCA[str(i)] = {'id': arq['id'], 'title': arq['title']}
-            tam = humanize.naturalsize(int(arq.get('fileSize', 0))) if arq.get('fileSize') else "Pasta"
+            tam = humanize.naturalsize(int(arq.get('fileSize', 0))) if arq.get('fileSize') else tr(client, "Pasta", "Folder")
             txt += f"**[{i}]** `{arq['title']}` ({tam})\n"
-        txt += f"\n💡 Use `{p}apagar [N]` para excluir."
+        txt += tr(client, f"\n💡 Use `{p}apagar [N]` para excluir.", f"\n💡 Use `{p}delete [N]` to delete.")
         await message.edit_text(txt)
     except Exception as e:
-        await message.edit_text(f"❌ Erro: `{e}`")
+        await message.edit_text(tr(client, f"❌ Erro: `{e}`", f"❌ Error: `{e}`"))
 
 
 @Client.on_message(cmd_filter("apagar") & filters.me)
@@ -223,22 +227,22 @@ async def drive_apagar(client, message):
     deletar_depois(message, 10)
     drive = getattr(client, "drive", None)
     if not drive:
-        return await message.edit_text("❌ Drive não conectado.")
+        return await message.edit_text(tr(client, "❌ Drive não conectado.", "❌ Drive not connected."))
     p = prefixo(client)
     partes = message.text.split(None, 1)
     if len(partes) < 2:
-        return await message.edit_text(f"⚠️ Use: `{p}apagar [N]` (após `{p}procurar`)")
+        return await message.edit_text(tr(client, f"⚠️ Use: `{p}apagar [N]` (após `{p}procurar`)", f"⚠️ Use: `{p}delete [N]` (after `{p}search`)"))
     num = partes[1].strip()
     global ULTIMA_BUSCA
     if num not in ULTIMA_BUSCA:
-        return await message.edit_text("❌ Número inválido. Faça uma busca primeiro.")
+        return await message.edit_text(tr(client, "❌ Número inválido. Faça uma busca primeiro.", "❌ Invalid number. Do a search first."))
     item = ULTIMA_BUSCA[num]
     try:
         def do_trash():
             f = drive.CreateFile({'id': item['id']})
             f.Trash()
         await asyncio.to_thread(do_trash)
-        await message.edit_text(f"🗑️ **Movido para a lixeira:**\n📁 `{item['title']}`")
+        await message.edit_text(tr(client, f"🗑️ **Movido para a lixeira:**\n📁 `{item['title']}`", f"🗑️ **Moved to trash:**\n📁 `{item['title']}`"))
         del ULTIMA_BUSCA[num]
     except Exception as e:
-        await message.edit_text(f"❌ Erro: `{e}`")
+        await message.edit_text(tr(client, f"❌ Erro: `{e}`", f"❌ Error: `{e}`"))
