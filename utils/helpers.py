@@ -5,6 +5,7 @@ Funções auxiliares compartilhadas por todos os plugins.
 import os
 import json
 import time
+import asyncio
 from pyrogram import filters, enums
 
 
@@ -21,6 +22,17 @@ def carregar(arquivo, padrao):
         except:
             pass
     return padrao
+
+
+def deletar_depois(message, tempo=15):
+    """Deleta uma mensagem automaticamente após X segundos sem travar o bot."""
+    async def _tarefa():
+        await asyncio.sleep(tempo)
+        try:
+            await message.delete()
+        except:
+            pass
+    asyncio.create_task(_tarefa())
 
 
 def prefixo(client):

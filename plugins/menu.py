@@ -15,7 +15,7 @@ import re
 import ast
 
 from pyrogram import filters, Client
-from utils.helpers import cmd_filter, prefixo
+from utils.helpers import cmd_filter, prefixo, deletar_depois
 
 
 def extrair_comandos_do_arquivo(filepath: str) -> list[dict]:
@@ -83,6 +83,7 @@ def nome_modulo(filename: str) -> str:
 @Client.on_message(cmd_filter("menu") & filters.me)
 async def cmd_menu(client, message):
     """Exibe todos os comandos disponíveis detectados automaticamente nos plugins."""
+    deletar_depois(message, 30)
     p = prefixo(client)
 
     # Detecta o diretório plugins/ relativo ao local do main.py

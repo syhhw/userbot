@@ -15,7 +15,7 @@ import platform
 import pyrogram
 
 from pyrogram import filters, Client
-from utils.helpers import cmd_filter, salvar
+from utils.helpers import cmd_filter, salvar, deletar_depois
 
 
 def _git(*args, timeout=30):
@@ -54,6 +54,7 @@ def _reiniciar_processo():
 @Client.on_message(cmd_filter("versao") & filters.me)
 async def cmd_versao(client, message):
     """Mostra a versão local, a remota e o último commit."""
+    deletar_depois(message, 15)
     versao_local = getattr(client, "VERSAO", "?")
     if not _e_repositorio_git():
         return await message.edit_text(
@@ -177,6 +178,7 @@ async def cmd_restart(client, message):
 @Client.on_message(cmd_filter("ping") & filters.me)
 async def cmd_ping(client, message):
     """Mede a latência do bot."""
+    deletar_depois(message, 5)
     inicio = time.time()
     await message.edit_text("⏳")
     delta = (time.time() - inicio) * 1000
@@ -205,11 +207,13 @@ async def cmd_speed(client, message):
         )
     except Exception as e:
         await message.edit_text(f"❌ Erro: `{e}`")
+    deletar_depois(message, 15)
 
 
 @Client.on_message(cmd_filter("sysinfo") & filters.me)
 async def cmd_sysinfo(client, message):
     """Exibe informações do sistema no estilo neofetch."""
+    deletar_depois(message, 30)
     cpu = psutil.cpu_percent(interval=0.5)
     ram = psutil.virtual_memory()
     disco = psutil.disk_usage('/')
@@ -243,6 +247,7 @@ async def cmd_sysinfo(client, message):
 @Client.on_message(cmd_filter("processos") & filters.me)
 async def cmd_processos(client, message):
     """Lista os 5 processos que mais consomem CPU."""
+    deletar_depois(message, 20)
     procs = sorted(
         psutil.process_iter(['pid', 'name', 'cpu_percent']),
         key=lambda x: x.info['cpu_percent'] or 0,

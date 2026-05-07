@@ -8,7 +8,7 @@ import aiohttp
 import humanize
 
 from pyrogram import filters, Client
-from utils.helpers import cmd_filter, prefixo, salvar, carregar
+from utils.helpers import cmd_filter, prefixo, salvar, carregar, deletar_depois
 
 CATEGORIAS = {
     '.apk': 'Apps', '.zip': 'Zips', '.rar': 'Zips', '.7z': 'Zips',
@@ -50,6 +50,7 @@ def obter_pasta(client, nome):
 @Client.on_message(cmd_filter("status") & filters.me)
 async def drive_status(client, message):
     """Exibe o uso de espaço do Google Drive."""
+    deletar_depois(message, 15)
     drive = getattr(client, "drive", None)
     if not drive:
         return await message.edit_text("❌ Drive não conectado.")
@@ -108,6 +109,7 @@ async def drive_organizar(client, message):
         await msg.edit_text(f"✅ **Organização concluída!**\n📦 `{movidos}` arquivos movidos da raiz para subpastas.")
     except Exception as e:
         await msg.edit_text(f"❌ Erro: `{e}`")
+    deletar_depois(msg, 15)
 
 
 @Client.on_message(cmd_filter("get") & filters.me)
@@ -153,11 +155,13 @@ async def drive_get(client, message):
         )
     except Exception as e:
         await msg.edit_text(f"❌ Erro: `{e}`")
+    deletar_depois(msg, 15)
 
 
 @Client.on_message(cmd_filter("direto") & filters.me)
 async def drive_direto(client, message):
     """Gera um link de download direto para um arquivo do Drive."""
+    deletar_depois(message, 20)
     drive = getattr(client, "drive", None)
     if not drive:
         return await message.edit_text("❌ Drive não conectado.")
@@ -182,6 +186,7 @@ async def drive_direto(client, message):
 @Client.on_message(cmd_filter("procurar") & filters.me)
 async def drive_procurar(client, message):
     """Busca arquivos no Drive pelo nome."""
+    deletar_depois(message, 30)
     drive = getattr(client, "drive", None)
     if not drive:
         return await message.edit_text("❌ Drive não conectado.")
@@ -214,6 +219,7 @@ async def drive_procurar(client, message):
 @Client.on_message(cmd_filter("apagar") & filters.me)
 async def drive_apagar(client, message):
     """Move um arquivo encontrado pelo procurar para a lixeira do Drive."""
+    deletar_depois(message, 10)
     drive = getattr(client, "drive", None)
     if not drive:
         return await message.edit_text("❌ Drive não conectado.")
