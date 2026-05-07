@@ -11,6 +11,7 @@ from utils.helpers import cmd_filter, prefixo, carregar, salvar, verificar_admin
 # Estado global do AFK (compartilhado dentro deste módulo)
 AFK_ATIVO = False
 AFK_MOTIVO = ""
+CAPTCHA_PENDENTE = {}
 
 CATEGORIAS = {
     '.apk': 'Apps', '.zip': 'Zips', '.rar': 'Zips', '.7z': 'Zips',
@@ -69,9 +70,34 @@ async def cmd_permit(client, message):
 async def pm_permit_checker(client, message):
     """Bloqueia mensagens privadas de usuários não autorizados."""
     permitidos = carregar("permitidos.json", [])
-    if message.from_user and message.from_user.id not in permitidos:
+    uid = message.from_user.id if message.from_user else message.chat.id
+    
+    if uid not in permitidos:
+        if uid in CAPTCHA_PENDENTE:
+            esperado = CAPTCHA_PENDENTE[uid]["resposta"]
+            if message.text and message.text.strip() == str(esperado):
+                permitidos.append(uid)
+                salvar("permitidos.json", permitidos)
+                del CAPTCHA_PENDENTE[uid]
+                await message.reply_text("✅ **Verificação concluída!** Você agora pode me enviar mensagens.")
+                message.stop_propagation()
+                return
+            else:
+                await message.reply_text("❌ **Resposta incorreta.** Tente novamente.")
+                message.stop_propagation()
+                return
+                
+        import random
+        n1 = random.randint(1, 10)
+        n2 = random.randint(1, 10)
+        CAPTCHA_PENDENTE[uid] = {"resposta": n1 + n2}
+        
         try:
-            await message.reply_text("🛡️ **Acesso restrito.** Aguarde autorização.")
+            await message.reply_text(
+                f"🛡️ **Sistema Anti-Spam**\n\n"
+                f"Acesso restrito. Para falar comigo, resolva a conta:\n"
+                f"**Quanto é {n1} + {n2}?**"
+            )
         except:
             pass
         cfg = getattr(client, "config", {})

@@ -188,11 +188,14 @@ async def cmd_speed(client, message):
     """Testa a velocidade da internet da VM."""
     await message.edit_text("🚀 **Testando velocidade...**")
     try:
-        s = speedtest.Speedtest()
-        s.get_best_server()
-        s.download()
-        s.upload()
-        r = s.results.dict()
+        def run_speedtest():
+            st = speedtest.Speedtest()
+            st.get_best_server()
+            st.download()
+            st.upload()
+            return st.results.dict()
+            
+        r = await asyncio.to_thread(run_speedtest)
         await message.edit_text(
             f"🚀 **Velocidade da Rede**\n\n"
             f"⬇️ Download: `{r['download']/10**6:.2f} Mbps`\n"

@@ -1,5 +1,5 @@
 """
-🚀 USERBOT PRO v1.0 - setup.py
+🚀 USERBOT PRO v2.0 - setup.py
 Configurador interativo inteligente:
   - Detecta e ativa a venv automaticamente antes de qualquer verificação.
   - Instala dependências faltantes automaticamente dentro da venv.
@@ -70,7 +70,7 @@ _garantir_venv()
 # ══════════════════════════════════════════════════════════════════════════════
 def cabecalho():
     print(f"\n{AZUL}{NEGRITO}╔════════════════════════════════════════════╗{RESET}")
-    print(f"{AZUL}{NEGRITO}║   🚀 USERBOT PRO v1.0 - SETUP INTELIGENTE  ║{RESET}")
+    print(f"{AZUL}{NEGRITO}║   🚀 USERBOT PRO v2.0 - SETUP INTELIGENTE  ║{RESET}")
     print(f"{AZUL}{NEGRITO}╚════════════════════════════════════════════╝{RESET}\n")
     print(f"  {CIANO}Python:{RESET} {sys.executable}")
     print(f"  {CIANO}Venv ativa:{RESET} {VERDE}Sim ✅{RESET}\n")
@@ -105,6 +105,8 @@ def instalar_dependencias(faltando: list) -> bool:
             "humanize": "humanize", "speedtest": "speedtest-cli", "PIL": "Pillow",
             "gtts": "gTTS", "deep_translator": "deep-translator",
             "psutil": "psutil", "tgcrypto": "TgCrypto", "pyromod": "pyromod",
+            "aiofiles": "aiofiles", "aiohttp": "aiohttp",
+            "google.generativeai": "google-generativeai"
         }
         for lib in faltando:
             pkg = pacotes_pip.get(lib, lib)
@@ -128,6 +130,9 @@ def verificar_bibliotecas() -> list:
         ("psutil",          "psutil"),
         ("tgcrypto",        "TgCrypto"),
         ("pyromod",         "pyromod"),
+        ("aiofiles",        "aiofiles"),
+        ("aiohttp",         "aiohttp"),
+        ("google.generativeai", "google-generativeai"),
     ]
     faltando = []
     for lib_import, lib_name in libs:
@@ -140,11 +145,11 @@ def verificar_bibliotecas() -> list:
     return faltando
 
 
-def reportar_erro_logs(api_id, api_hash, canal_id, erro: str):
+def notificar_log_telegram(canal_id, texto: str):
     """
-    Tenta enviar uma mensagem de erro ao canal de logs do dono via API HTTP
+    Tenta enviar uma mensagem ao canal de logs do dono via API HTTP
     do Telegram (sem precisar do Pyrogram completo).
-    Usado para notificar bugs de outros usuários durante o setup.
+    Usado para notificar movimentações e erros durante o setup.
     """
     try:
         import requests as req
@@ -156,17 +161,11 @@ def reportar_erro_logs(api_id, api_hash, canal_id, erro: str):
         with open(config_path) as f:
             cfg = json.load(f)
         bot_token = cfg.get("BOT_TOKEN")
-        if not bot_token or not canal_id:
+        canal = canal_id or cfg.get("ID_CANAL_LOGS")
+        if not bot_token or not canal:
             return
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-        texto = (
-            f"🚨 **ERRO NO SETUP — USERBOT PRO**\n\n"
-            f"👤 Usuário com API_ID: `{api_id}`\n"
-            f"❌ Erro: `{erro}`\n"
-            f"🖥️ Python: `{sys.version}`\n"
-            f"📂 Dir: `{os.getcwd()}`"
-        )
-        req.post(url, json={"chat_id": canal_id, "text": texto, "parse_mode": "Markdown"}, timeout=5)
+        req.post(url, json={"chat_id": canal, "text": texto, "parse_mode": "Markdown"}, timeout=5)
     except Exception:
         pass  # Silencioso — não deve travar o setup
 
@@ -267,11 +266,18 @@ def main():
         bot_token = input(f"  🤖 BOT_TOKEN (Enter para pular): ").strip()
         if bot_token:
             config['BOT_TOKEN'] = bot_token
+            
+        print(f"\n  {CIANO}ℹ️  (Opcional) Chave API do Google Gemini para comandos de Inteligência Artificial.{RESET}")
+        gemini_key = input(f"  🤖 GEMINI_API_KEY (Enter para pular): ").strip()
+        if gemini_key:
+            config['GEMINI_API_KEY'] = gemini_key
 
         with open("config.json", "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4, ensure_ascii=False)
 
         print(f"\n{VERDE}{NEGRITO}✅ config.json criado com sucesso!{RESET}\n")
+        
+        notificar_log_telegram(canal_id, "✅ **SETUP CONCLUÍDO**\nAs configurações do Userbot foram geradas ou atualizadas com sucesso!")
         print(f"{AZUL}🚀 Próximos passos:{RESET}")
         print(f"   • Inicie o bot: {VERDE}python3 main.py{RESET}")
         print()
@@ -279,14 +285,17 @@ def main():
     except ValueError as e:
         msg = f"API_ID e ID do Canal devem ser apenas números. Detalhe: {e}"
         print(f"\n{VERMELHO}❌ Erro: {msg}{RESET}\n")
-        reportar_erro_logs(api_id_raw, config.get('API_HASH'), canal_id, msg)
+        texto_erro = f"🚨 **ERRO NO SETUP**\n\n👤 API_ID: `{api_id_raw}`\n❌ Erro: `{msg}`"
+        notificar_log_telegram(canal_id, texto_erro)
 
     except KeyboardInterrupt:
         print(f"\n\n{AMARELO}Cancelado pelo usuário.{RESET}\n")
+        notificar_log_telegram(canal_id, "⚠️ **SETUP CANCELADO**\nO usuário interrompeu a configuração pelo terminal.")
 
     except Exception as e:
         print(f"\n{VERMELHO}❌ Erro inesperado: {e}{RESET}\n")
-        reportar_erro_logs(api_id_raw, config.get('API_HASH'), canal_id, str(e))
+        texto_erro = f"🚨 **ERRO INESPERADO NO SETUP**\n\n👤 API_ID: `{api_id_raw}`\n❌ Erro: `{e}`"
+        notificar_log_telegram(canal_id, texto_erro)
 
 
 if __name__ == "__main__":

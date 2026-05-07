@@ -7,7 +7,7 @@ import re
 import asyncio
 import random
 import textwrap
-import requests
+import aiohttp
 
 from gtts import gTTS
 from PIL import Image, ImageDraw, ImageFont
@@ -132,8 +132,11 @@ async def cmd_voz(client, message):
     await message.edit_text("🎙️ **Gerando áudio...**")
     arquivo = "voz_temp.ogg"
     try:
-        tts = gTTS(text=texto, lang='pt')
-        tts.save(arquivo)
+        def gerar_tts():
+            tts = gTTS(text=texto, lang='pt')
+            tts.save(arquivo)
+            
+        await asyncio.to_thread(gerar_tts)
         await client.send_voice(message.chat.id, arquivo)
         os.remove(arquivo)
         await message.delete()
@@ -142,6 +145,21 @@ async def cmd_voz(client, message):
         if os.path.exists(arquivo):
             os.remove(arquivo)
 
+
+def gerar_print_img(texto, autor, arquivo):
+    ft = ImageFont.truetype("Roboto-Medium.ttf", 26)
+    fa = ImageFont.truetype("Roboto-Medium.ttf", 22)
+    linhas = textwrap.wrap(texto, width=38)
+    altura = 100 + (len(linhas) * 35)
+    img = Image.new('RGBA', (600, altura), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([(10, 10), (590, altura - 10)], radius=15, fill=(33, 45, 59))
+    d.text((30, 25), autor, fill=(100, 181, 239), font=fa)
+    y = 65
+    for linha in linhas:
+        d.text((30, y), linha, fill=(255, 255, 255), font=ft)
+        y += 35
+    img.save(arquivo)
 
 @Client.on_message(cmd_filter("print") & filters.me)
 async def cmd_print(client, message):
@@ -156,25 +174,13 @@ async def cmd_print(client, message):
         if message.reply_to_message.from_user:
             autor = message.reply_to_message.from_user.first_name
         if not os.path.exists("Roboto-Medium.ttf"):
-            r = requests.get(
-                "https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Medium.ttf",
-                timeout=15
-            )
+            async with aiohttp.ClientSession() as session:
+                async with session.get("https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Medium.ttf") as r:
+                    conteudo = await r.read()
             with open("Roboto-Medium.ttf", "wb") as f:
-                f.write(r.content)
-        ft = ImageFont.truetype("Roboto-Medium.ttf", 26)
-        fa = ImageFont.truetype("Roboto-Medium.ttf", 22)
-        linhas = textwrap.wrap(texto, width=38)
-        altura = 100 + (len(linhas) * 35)
-        img = Image.new('RGBA', (600, altura), (0, 0, 0, 0))
-        d = ImageDraw.Draw(img)
-        d.rounded_rectangle([(10, 10), (590, altura - 10)], radius=15, fill=(33, 45, 59))
-        d.text((30, 25), autor, fill=(100, 181, 239), font=fa)
-        y = 65
-        for linha in linhas:
-            d.text((30, y), linha, fill=(255, 255, 255), font=ft)
-            y += 35
-        img.save(arquivo)
+                f.write(conteudo)
+                
+        await asyncio.to_thread(gerar_print_img, texto, autor, arquivo)
         await client.send_document(message.chat.id, arquivo, file_name="Print.png")
         os.remove(arquivo)
         await message.delete()
@@ -194,8 +200,10 @@ async def cmd_encurtar(client, message):
     url = partes[1].strip()
     await message.edit_text("🔗 **Encurtando...**")
     try:
-        r = requests.get(f"https://tinyurl.com/api-create.php?url={url}", timeout=10)
-        await message.edit_text(f"🔗 **Encurtado:**\n`{r.text}`")
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"https://tinyurl.com/api-create.php?url={url}") as r:
+                texto_url = await r.text()
+        await message.edit_text(f"🔗 **Encurtado:**\n`{texto_url}`")
     except Exception as e:
         await message.edit_text(f"❌ Erro: `{e}`")
 
@@ -208,7 +216,9 @@ async def cmd_ipinfo(client, message):
     await message.edit_text("🌐 **Buscando dados do IP...**")
     try:
         url = f"https://ipinfo.io/{ip}/json" if ip else "https://ipinfo.io/json"
-        r = requests.get(url, timeout=10).json()
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as res:
+                r = await res.json()
         await message.edit_text(
             f"🌐 **IP Info**\n\n"
             f"📍 IP: `{r.get('ip', 'N/A')}`\n"
@@ -230,17 +240,17 @@ async def cmd_clima(client, message):
     await message.edit_text(f"🌤️ **Buscando clima de `{cidade}`...**")
     try:
         cidade_url = cidade.replace(" ", "+")
-        r = requests.get(
-            f"https://wttr.in/{cidade_url}?format=%l:+%C+%t+%h+%w&lang=pt",
-            timeout=10,
-            headers={"User-Agent": "curl/7.68.0"}
-        )
-        if r.status_code == 200 and "Unknown location" not in r.text and "ERROR" not in r.text:
-            await message.edit_text(f"🌍 **Clima:**\n`{r.text.strip()}`")
+        async with aiohttp.ClientSession(headers={"User-Agent": "curl/7.68.0"}) as session:
+            async with session.get(f"https://wttr.in/{cidade_url}?format=%l:+%C+%t+%h+%w&lang=pt") as r:
+                status = r.status
+                texto = await r.text()
+                
+        if status == 200 and "Unknown location" not in texto and "ERROR" not in texto:
+            await message.edit_text(f"🌍 **Clima:**\n`{texto.strip()}`")
         else:
             await message.edit_text("❌ Localidade não encontrada.")
-    except requests.Timeout:
-        await message.edit_text("❌ Tempo esgotado. Tente novamente.")
+    except asyncio.TimeoutError:
+        await message.edit_text("❌ Tempo esgotado (Timeout).")
     except Exception as e:
         await message.edit_text(f"❌ Erro: `{e}`")
 
@@ -257,15 +267,15 @@ async def cmd_specs(client, message):
     try:
         termo = modelo.replace(" ", "+")
         headers = {"User-Agent": "Mozilla/5.0 (Linux; Android 14)"}
-        r = requests.get(
-            f"https://www.gsmarena.com/results.php3?sQuickSearch=yes&sName={termo}",
-            headers=headers, timeout=15
-        )
-        links = re.findall(r'href="([a-z0-9_]+-\d+\.php)"', r.text)
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(f"https://www.gsmarena.com/results.php3?sQuickSearch=yes&sName={termo}") as r:
+                html_busca = await r.text()
+        links = re.findall(r'href="([a-z0-9_]+-\d+\.php)"', html_busca)
         if links:
             url_ficha = f"https://www.gsmarena.com/{links[0]}"
-            r2 = requests.get(url_ficha, headers=headers, timeout=15)
-            html = r2.text
+            async with aiohttp.ClientSession(headers=headers) as session:
+                async with session.get(url_ficha) as r2:
+                    html = await r2.text()
             nome = re.search(r'<h1 class="specs-phone-name-title">(.*?)</h1>', html)
             proc = re.search(r'data-spec="chipset">(.*?)</td>', html, re.DOTALL)
             ram = re.search(r'data-spec="internalmemory">(.*?)</td>', html, re.DOTALL)

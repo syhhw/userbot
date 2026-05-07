@@ -1,5 +1,5 @@
 """
-🚀 USERBOT PRO v1.0 - main.py
+🚀 USERBOT PRO v2.0 - main.py
 Núcleo central que carrega configurações, conecta ao Google Drive
 e inicializa o cliente Pyrogram com os plugins.
 
@@ -137,7 +137,7 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 # 🟢 IDENTIDADE DO PROJETO
 # ══════════════════════════════════════════════════════════════════════════════
-__VERSAO__ = "1.0"
+__VERSAO__ = "2.0"
 UPDATE_FLAG = ".update_pending.json"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -221,6 +221,10 @@ def manipulador_erros(loop, context):
     erro = str(context.get("exception", ""))
     if any(x in erro for x in ["Peer id invalid", "Message to delete not found", "MESSAGE_NOT_MODIFIED"]):
         return
+    try:
+        app.loop.create_task(app.send_message(config["ID_CANAL_LOGS"], f"⚠️ **ALERTA DO SISTEMA:**\nErro interno detectado em uma das tarefas de execução:\n`{erro}`"))
+    except Exception:
+        pass
     loop.default_exception_handler(context)
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -277,6 +281,10 @@ async def iniciar():
 
     logger.info(f"✅ USERBOT ONLINE | Prefixo: '{PREFIXO}' | Aguardando comandos...")
     await idle()
+    try:
+        await app.send_message(config["ID_CANAL_LOGS"], "🛑 **USERBOT OFFLINE**\nO processo foi encerrado de forma segura.")
+    except Exception:
+        pass
     await app.stop()
     logger.info("👋 Userbot encerrado.")
 
