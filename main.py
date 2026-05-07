@@ -300,13 +300,11 @@ async def iniciar():
                 if len(arquivos) > 15:
                     lista_arq += f"\n  • ... e mais {len(arquivos) - 15} arquivo(s)"
                 texto_update = (
-                    f"✅ **AUTO-UPDATE CONCLUÍDO**\n\n"
-                    f"📦 Versão: `v{__VERSAO__}`\n"
-                    f"🔢 Commit: `{info_update.get('commit', 'n/a')}`\n"
-                    f"👤 Autor: `{info_update.get('autor', 'n/a')}`\n"
-                    f"💬 Mensagem: _{info_update.get('mensagem', 'n/a')}_\n"
-                    f"📁 Arquivos alterados ({len(arquivos)}):\n{lista_arq}\n\n"
-                    f"🔧 Prefixo: `{PREFIXO}` | 📂 Drive: {'Conectado' if drive else 'OFFLINE'}"
+                    f"🔄 **SISTEMA ATUALIZADO**\n\n"
+                    f"**Versão:** `v{__VERSAO__}`\n"
+                    f"**Commit:** `{info_update.get('commit', 'n/a')}`\n"
+                    f"**Arquivos:** `{len(arquivos)} modificado(s)`\n\n"
+                    f"💬 _{info_update.get('mensagem', 'n/a')}_\n"
                     f"{screen_info}"
                 )
                 await app.send_message(config["ID_CANAL_LOGS"], texto_update)
@@ -336,10 +334,10 @@ async def iniciar():
         else:
             await app.send_message(
                 config["ID_CANAL_LOGS"],
-                f"🚀 **Userbot v{__VERSAO__} ONLINE!**\n\n"
-                f"✅ Sistema sincronizado.\n"
-                f"🔧 Prefixo: `{PREFIXO}`\n"
-                f"📂 Drive: {'Conectado' if drive else 'OFFLINE'}"
+                f"🟢 **USERBOT ONLINE**\n\n"
+                f"├ **Versão:** `v{__VERSAO__}`\n"
+                f"├ **Prefixo:** `{PREFIXO}`\n"
+                f"└ **Drive:** {'✅ Conectado' if drive else '❌ Offline'}\n"
                 f"{screen_info}"
             )
     except Exception as e:

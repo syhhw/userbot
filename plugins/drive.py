@@ -149,9 +149,10 @@ async def drive_get(client, message):
         f_drive, categoria = await asyncio.to_thread(do_upload)
         os.remove(local)
         await msg.edit_text(
-            f"✅ **Upload concluído!**\n"
-            f"📁 `{nome}` → `{categoria}`\n"
-            f"🔗 [Abrir no Drive]({f_drive['alternateLink']})"
+            f"✅ **Transferência Concluída!**\n"
+            f"├ 📁 **Arquivo:** `{nome}`\n"
+            f"├ 🗂️ **Categoria:** `{categoria}`\n"
+            f"└ 🔗 [Acessar no Google Drive]({f_drive['alternateLink']})"
         )
     except Exception as e:
         await msg.edit_text(f"❌ Erro: `{e}`")

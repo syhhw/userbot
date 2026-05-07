@@ -238,13 +238,12 @@ async def cmd_ipinfo(client, message):
             async with session.get(url) as res:
                 r = await res.json()
         await message.edit_text(
-            f"🌐 **IP Info**\n\n"
-            f"📍 IP: `{r.get('ip', 'N/A')}`\n"
-            f"🏙️ Cidade: `{r.get('city', 'N/A')}`\n"
-            f"🗺️ Região: `{r.get('region', 'N/A')}`\n"
-            f"🌍 País: `{r.get('country', 'N/A')}`\n"
-            f"🏢 Org: `{r.get('org', 'N/A')}`\n"
-            f"⏰ Fuso: `{r.get('timezone', 'N/A')}`"
+            f"🌐 **IP Info** (`{r.get('ip', 'N/A')}`)\n"
+            f"├ 🏙️ **Cidade:** `{r.get('city', 'N/A')}`\n"
+            f"├ 🗺️ **Região:** `{r.get('region', 'N/A')}`\n"
+            f"├ 🌍 **País:** `{r.get('country', 'N/A')}`\n"
+            f"├ 🏢 **Org:** `{r.get('org', 'N/A')}`\n"
+            f"└ ⏰ **Fuso:** `{r.get('timezone', 'N/A')}`"
         )
     except Exception as e:
         await message.edit_text(f"❌ Erro: `{e}`")
@@ -302,13 +301,13 @@ async def cmd_specs(client, message):
             cam = re.search(r'data-spec="cam1modules">(.*?)</td>', html, re.DOTALL)
             limpar = lambda t: re.sub('<.*?>', '', t).strip() if t else "N/A"
             await message.edit_text(
-                f"📱 **{nome.group(1).strip() if nome else modelo.upper()}**\n\n"
-                f"⚙️ Processador: `{limpar(proc.group(1)) if proc else 'N/A'}`\n"
-                f"💾 Memória: `{limpar(ram.group(1)) if ram else 'N/A'}`\n"
-                f"📺 Tela: `{limpar(disp.group(1)) if disp else 'N/A'}`\n"
-                f"📷 Câmera: `{limpar(cam.group(1))[:60] if cam else 'N/A'}`\n"
-                f"🔋 Bateria: `{limpar(bat.group(1))[:60] if bat else 'N/A'}`\n\n"
-                f"🔗 [Ficha completa]({url_ficha})"
+                f"📱 **{nome.group(1).strip() if nome else modelo.upper()}**\n"
+                f"├ ⚙️ **CPU:** `{limpar(proc.group(1)) if proc else 'N/A'}`\n"
+                f"├ 💾 **RAM:** `{limpar(ram.group(1)) if ram else 'N/A'}`\n"
+                f"├ 📺 **Tela:** `{limpar(disp.group(1)) if disp else 'N/A'}`\n"
+                f"├ 📷 **Câmera:** `{limpar(cam.group(1))[:60] if cam else 'N/A'}`\n"
+                f"└ 🔋 **Bateria:** `{limpar(bat.group(1))[:60] if bat else 'N/A'}`\n\n"
+                f"🔗 Ficha completa no GSMArena"
             )
         else:
             await message.edit_text(

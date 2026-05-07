@@ -180,9 +180,9 @@ async def cmd_ping(client, message):
     """Mede a latência do bot."""
     deletar_depois(message, 5)
     inicio = time.time()
-    await message.edit_text("⏳")
+    await message.edit_text("⏱️")
     delta = (time.time() - inicio) * 1000
-    await message.edit_text(f"🚀 **Pong!** `{delta:.0f}ms`")
+    await message.edit_text(f"⚡ **Ping:** `{delta:.0f}ms`")
 
 
 @Client.on_message(cmd_filter("speed") & filters.me)
@@ -199,11 +199,11 @@ async def cmd_speed(client, message):
             
         r = await asyncio.to_thread(run_speedtest)
         await message.edit_text(
-            f"🚀 **Velocidade da Rede**\n\n"
-            f"⬇️ Download: `{r['download']/10**6:.2f} Mbps`\n"
-            f"⬆️ Upload: `{r['upload']/10**6:.2f} Mbps`\n"
-            f"📡 Ping: `{r['ping']:.1f} ms`\n"
-            f"🌐 Servidor: `{r['server']['name']}`"
+            f"🌐 **Network Speedtest**\n"
+            f"├ ⬇️ **Download:** `{r['download']/10**6:.2f} Mbps`\n"
+            f"├ ⬆️ **Upload:** `{r['upload']/10**6:.2f} Mbps`\n"
+            f"├ 📶 **Ping:** `{r['ping']:.1f} ms`\n"
+            f"└ 🏢 **Servidor:** `{r['server']['name']}`"
         )
     except Exception as e:
         await message.edit_text(f"❌ Erro: `{e}`")

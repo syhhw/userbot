@@ -51,7 +51,7 @@ async def cmd_ask(client, message):
     if not pergunta:
         return await message.edit_text("⚠️ Use: `,ask [pergunta]` ou responda a algo.")
     
-    await message.edit_text("🤖 **Pensando...**")
+    await message.edit_text("🧠 **Processando consulta...**")
     try:
         def run_ai():
             modelo_nome = obter_modelo_otimizado(api_key)
@@ -59,7 +59,7 @@ async def cmd_ask(client, message):
             return model.generate_content(pergunta).text
             
         resposta = await asyncio.to_thread(run_ai)
-        await message.edit_text(f"🤖 **Resposta:**\n\n{resposta}")
+        await message.edit_text(f"🧠 **Gemini AI:**\n\n{resposta}")
     except Exception as e:
         await message.edit_text(f"❌ Erro na IA: `{e}`")
 
@@ -71,7 +71,7 @@ async def cmd_resumir(client, message):
     if not HAS_GEMINI or not api_key:
         return await message.edit_text("❌ IA não configurada (faltando chave ou biblioteca).")
     
-    await message.edit_text("🤖 **Lendo as últimas mensagens...**")
+    await message.edit_text("📚 **Analisando últimas mensagens...**")
     try:
         msgs = []
         async for m in client.get_chat_history(message.chat.id, limit=50):
@@ -91,6 +91,6 @@ async def cmd_resumir(client, message):
             return model.generate_content(prompt).text
             
         resposta = await asyncio.to_thread(run_summary)
-        await message.edit_text(f"📝 **Resumo do Chat:**\n\n{resposta}")
+        await message.edit_text(f"📚 **Resumo Analítico:**\n\n{resposta}")
     except Exception as e:
         await message.edit_text(f"❌ Erro ao resumir: `{e}`")

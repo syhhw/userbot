@@ -117,8 +117,9 @@ async def cmd_menu(client, message):
 
     versao = getattr(client, "VERSAO", "1.0")
     header = (
-        f"💎 **USERBOT PRO v{versao}**\n"
-        f"🔧 Prefixo: `{p}` | 📦 `{total_cmds}` comandos\n"
+        f"⚡ **USERBOT PRO v{versao}**\n"
+        f"├ 🔧 **Prefixo:** `{p}`\n"
+        f"└ 📦 **Comandos:** `{total_cmds}`\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n\n"
     )
 

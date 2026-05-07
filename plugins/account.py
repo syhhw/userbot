@@ -35,7 +35,7 @@ async def cmd_afk(client, message):
     partes = message.text.split(None, 1)
     AFK_MOTIVO = partes[1].strip() if len(partes) > 1 else "Ausente."
     AFK_ATIVO = True
-    await message.edit_text(f"💤 **Modo AFK ativado**\n📝 Motivo: `{AFK_MOTIVO}`")
+    await message.edit_text(f"💤 **Modo AFK Ativado**\n└ 📝 **Motivo:** `{AFK_MOTIVO}`")
 
 
 @Client.on_message(cmd_filter("unafk") & filters.me)
@@ -94,9 +94,9 @@ async def pm_permit_checker(client, message):
         
         try:
             await message.reply_text(
-                f"🛡️ **Sistema Anti-Spam**\n\n"
-                f"Acesso restrito. Para falar comigo, resolva a conta:\n"
-                f"**Quanto é {n1} + {n2}?**"
+                f"🛡️ **Firewall de Segurança**\n\n"
+                f"Mensagens restritas. Para provar que é humano, resolva a conta:\n"
+                f"👉 **{n1} + {n2} = ?**"
             )
         except:
             pass
