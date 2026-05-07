@@ -213,6 +213,8 @@ except json.JSONDecodeError as e:
 
 PREFIXO = config.get("PREFIXO", ",")
 logger.info(f"🔧 Prefixo carregado: '{PREFIXO}'")
+LANGUAGE = config.get("LANGUAGE", "pt")
+logger.info(f"🌐 Idioma / Language: '{LANGUAGE.upper()}'")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 🟢 AUTENTICAÇÃO GOOGLE DRIVE (opcional)
@@ -261,6 +263,7 @@ app.config       = config
 app.drive        = drive
 app.tempo_inicio = time.time()
 app.PREFIXO      = PREFIXO
+app.LANG         = LANGUAGE
 app.VERSAO       = __VERSAO__
 app.UPDATE_FLAG  = UPDATE_FLAG
 
@@ -300,10 +303,8 @@ async def iniciar():
                 if len(arquivos) > 15:
                     lista_arq += f"\n  • ... e mais {len(arquivos) - 15} arquivo(s)"
                 texto_update = (
-                    f"🔄 **SISTEMA ATUALIZADO**\n\n"
-                    f"**Versão:** `v{__VERSAO__}`\n"
-                    f"**Commit:** `{info_update.get('commit', 'n/a')}`\n"
-                    f"**Arquivos:** `{len(arquivos)} modificado(s)`\n\n"
+                    f"🔄 **SISTEMA ATUALIZADO** / **SYSTEM UPDATED**\n\n"
+                    f"📦 **v{__VERSAO__}** (`{info_update.get('commit', 'n/a')}`)\n"
                     f"💬 _{info_update.get('mensagem', 'n/a')}_\n"
                     f"{screen_info}"
                 )

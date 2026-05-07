@@ -66,6 +66,14 @@ def _garantir_venv():
 _garantir_venv()
 
 # ══════════════════════════════════════════════════════════════════════════════
+# 🌐 SUPORTE MULTI-IDIOMA DO SETUP
+# ══════════════════════════════════════════════════════════════════════════════
+_LANG = "pt"
+
+def t(pt: str, en: str) -> str:
+    return en if _LANG == "en" else pt
+
+# ══════════════════════════════════════════════════════════════════════════════
 # 🟢 FUNÇÕES AUXILIARES
 # ══════════════════════════════════════════════════════════════════════════════
 def cabecalho():
@@ -251,14 +259,15 @@ def main():
         api_id_raw              = input(f"  🔑 API_ID: ").strip()
         config['API_ID']        = int(api_id_raw)
         config['API_HASH']      = input(f"  🔐 API_HASH: ").strip()
-        canal_raw               = input(f"  📡 ID do canal de logs (com -100): ").strip()
+        canal_raw               = input(t(f"  📡 ID do canal de logs (com -100): ", f"  📡 Logs channel ID (with -100): ")).strip()
         config['ID_CANAL_LOGS'] = int(canal_raw)
         canal_id                = config['ID_CANAL_LOGS']
-        config['PREFIXO']       = input(f"  ⌨️  Prefixo dos comandos (padrão ','): ").strip() or ","
+        config['PREFIXO']       = input(t(f"  ⌨️  Prefixo dos comandos (padrão ','): ", f"  ⌨️  Command prefix (default ','): ")).strip() or ","
         config['DRIVE_ATIVO']   = drive_ativo
+        config['LANGUAGE']      = _LANG
 
         if drive_ativo:
-            pasta = input(f"  📁 ID da pasta raiz do Google Drive: ").strip()
+            pasta = input(t(f"  📁 ID da pasta raiz do Drive: ", f"  📁 Root Drive folder ID: ")).strip()
             config['ID_PASTA_RAIZ_DRIVE'] = pasta
             limite = input(f"  📦 Limite auto-upload em MB (padrão 20): ").strip() or "20"
             config['LIMITE_AUTO_UPLOAD'] = int(limite) * 1024 * 1024

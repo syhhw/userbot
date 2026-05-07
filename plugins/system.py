@@ -15,7 +15,7 @@ import platform
 import pyrogram
 
 from pyrogram import filters, Client
-from utils.helpers import cmd_filter, salvar, deletar_depois
+from utils.helpers import cmd_filter, salvar, deletar_depois, tr
 
 
 def _git(*args, timeout=30):
@@ -182,7 +182,27 @@ async def cmd_ping(client, message):
     inicio = time.time()
     await message.edit_text("⏱️")
     delta = (time.time() - inicio) * 1000
-    await message.edit_text(f"⚡ **Ping:** `{delta:.0f}ms`")
+    await message.edit_text(tr(client, f"⚡ **Ping:** `{delta:.0f}ms`", f"⚡ **Latency:** `{delta:.0f}ms`"))
+
+
+@Client.on_message(cmd_filter("idioma") & filters.me)
+async def cmd_idioma(client, message):
+    """Altera o idioma do bot (pt/en)."""
+    p = getattr(client, "PREFIXO", ",")
+    partes = message.text.split()
+    if len(partes) < 2 or partes[1].lower() not in ["pt", "en"]:
+        atual = getattr(client, "LANG", "pt").upper()
+        msg = tr(client, f"⚠️ Use: `{p}idioma [pt/en]`\n🌐 Idioma atual: `{atual}`", f"⚠️ Use: `{p}lang [pt/en]`\n🌐 Current lang: `{atual}`")
+        return await message.edit_text(msg)
+    
+    novo = partes[1].lower()
+    client.LANG = novo
+    cfg = getattr(client, "config", {})
+    cfg["LANGUAGE"] = novo
+    salvar("config.json", cfg)
+    
+    resp = "✅ **Idioma alterado para Português!**" if novo == "pt" else "✅ **Language changed to English!**"
+    await message.edit_text(resp)
 
 
 @Client.on_message(cmd_filter("speed") & filters.me)
@@ -228,7 +248,7 @@ async def cmd_sysinfo(client, message):
     versao = getattr(client, "VERSAO", "1.0")
 
     texto = (
-        f"💻 **System Info (Neofetch)**\n\n"
+        tr(client, f"💻 **Sistema (Neofetch)**\n\n", f"💻 **System Info (Neofetch)**\n\n") +
         f"```text\n"
         f"OS       : {os_info}\n"
         f"Bot Up   : {uptime_bot}\n"

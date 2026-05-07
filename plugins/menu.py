@@ -15,7 +15,7 @@ import re
 import ast
 
 from pyrogram import filters, Client
-from utils.helpers import cmd_filter, prefixo, deletar_depois
+from utils.helpers import cmd_filter, prefixo, deletar_depois, tr, EN_ALIASES
 
 
 def extrair_comandos_do_arquivo(filepath: str) -> list[dict]:
@@ -67,16 +67,26 @@ def extrair_comandos_do_arquivo(filepath: str) -> list[dict]:
     return comandos
 
 
-def nome_modulo(filename: str) -> str:
+def nome_modulo(client, filename: str) -> str:
     """Converte o nome do arquivo em um título legível para o menu."""
-    nomes = {
-        "system.py":     "🖥️ Sistema",
-        "moderation.py": "👮 Moderação",
-        "drive.py":      "📂 Google Drive",
-        "tools.py":      "🛠️ Ferramentas",
-        "account.py":    "👤 Conta & AFK",
-        "kang.py":       "🎭 Figurinhas",
-    }
+    if getattr(client, "LANG", "pt") == "en":
+        nomes = {
+            "system.py":     "🖥️ System",
+            "moderation.py": "👮 Moderation",
+            "drive.py":      "📂 Google Drive",
+            "tools.py":      "🛠️ Tools",
+            "account.py":    "👤 Account & AFK",
+            "kang.py":       "🎭 Stickers",
+        }
+    else:
+        nomes = {
+            "system.py":     "🖥️ Sistema",
+            "moderation.py": "👮 Moderação",
+            "drive.py":      "📂 Google Drive",
+            "tools.py":      "🛠️ Ferramentas",
+            "account.py":    "👤 Conta & AFK",
+            "kang.py":       "🎭 Figurinhas",
+        }
     return nomes.get(filename, f"🔌 {filename.replace('.py', '').capitalize()}")
 
 
@@ -105,21 +115,28 @@ async def cmd_menu(client, message):
         if not comandos:
             continue
 
-        titulo = nome_modulo(filename)
-        linha_cmds = " ".join([f"`{p}{c['cmd']}`" for c in comandos])
+        titulo = nome_modulo(client, filename)
+        
+        lang = getattr(client, "LANG", "pt")
+        cmds_list = []
+        for c in comandos:
+            nome_cmd = EN_ALIASES.get(c['cmd'], c['cmd']) if lang == "en" else c['cmd']
+            cmds_list.append(f"`{p}{nome_cmd}`")
+            
+        linha_cmds = " ".join(cmds_list)
         secoes.append(f"**{titulo}**\n{linha_cmds}")
         total_cmds += len(comandos)
 
     if not secoes:
         return await message.edit_text(
-            f"⚠️ Nenhum comando encontrado na pasta `plugins/`."
+            tr(client, f"⚠️ Nenhum comando encontrado.", f"⚠️ No commands found in plugins.")
         )
 
     versao = getattr(client, "VERSAO", "1.0")
     header = (
         f"⚡ **USERBOT PRO v{versao}**\n"
         f"├ 🔧 **Prefixo:** `{p}`\n"
-        f"└ 📦 **Comandos:** `{total_cmds}`\n"
+        f"└ 📦 **{tr(client, 'Comandos', 'Commands')}:** `{total_cmds}`\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n\n"
     )
 

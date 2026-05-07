@@ -9,6 +9,21 @@ import asyncio
 from pyrogram import filters, enums
 
 
+EN_ALIASES = {
+    "versao": "version", "atualizar": "update", "processos": "processes",
+    "organizar": "organize", "procurar": "search", "apagar": "delete",
+    "encurtar": "shorten", "clima": "weather", "voz": "voice",
+    "direto": "direct", "resumir": "summarize", "idioma": "lang",
+    "zombies": "zombies", "reverter": "revert"
+}
+
+
+def tr(client, pt: str, en: str) -> str:
+    """Retorna o texto em Inglês se o idioma do bot for 'en', senão retorna em Português."""
+    lang = getattr(client, "LANG", "pt")
+    return en if lang == "en" else pt
+
+
 def salvar(arquivo, dados):
     with open(arquivo, "w", encoding="utf-8") as f:
         json.dump(dados, f, indent=2, ensure_ascii=False)
@@ -45,7 +60,15 @@ def cmd_filter(nome):
         if not message.text:
             return False
         p = prefixo(client)
-        return message.text == f"{p}{nome}" or message.text.startswith(f"{p}{nome} ")
+        lang = getattr(client, "LANG", "pt")
+        alias = EN_ALIASES.get(nome, nome)
+        validos = [nome]
+        if lang == "en" and alias != nome:
+            validos.append(alias)
+        for cmd in validos:
+            if message.text == f"{p}{cmd}" or message.text.startswith(f"{p}{cmd} "):
+                return True
+        return False
     return filters.create(func)
 
 
