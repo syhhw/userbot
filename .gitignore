@@ -1,23 +1,28 @@
-# Arquivos de Sessão do Telegram
+# ─── Python ───
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+
+# ─── Pyrogram Sessões (CRÍTICO) ───
 *.session
 *.session-journal
 
-# Configurações e Chaves (NUNCA ENVIAR PARA O GITHUB)
+# ─── Configurações e Credenciais (CRÍTICO) ───
 config.json
 meu_drive.json
 client_secrets.json
+credentials.json
 
-# Caches e Dados Locais
+# ─── Bancos de Dados Locais e Caches ───
+permitidos.json
 admin_cache.json
 feds.json
-permitidos.json
+triggers.json
 .update_pending.json
-__pycache__/
-*.pyc
+.deps_updated.json
 
-# Arquivos Temporários
-downloads/
-*.png
-*.ogg
-*.zip
-*.ttf
+# ─── Logs e Temporários ───
+*.log
