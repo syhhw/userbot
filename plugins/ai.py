@@ -13,6 +13,26 @@ except ImportError:
     HAS_GEMINI = False
 
 
+def obter_modelo_otimizado(api_key: str) -> str:
+    """Consulta a API do Google para descobrir qual modelo gratuito está liberado para a chave do usuário."""
+    genai.configure(api_key=api_key)
+    best_model = None
+    try:
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                name = m.name.replace("models/", "")
+                if "flash" in name.lower():
+                    best_model = name
+                    break
+        if not best_model:
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    return m.name.replace("models/", "")
+    except Exception:
+        pass
+    return best_model or "gemini-1.5-flash"
+
+
 @Client.on_message(cmd_filter("ask") & filters.me)
 async def cmd_ask(client, message):
     """Faz uma pergunta para a IA (Gemini)."""
@@ -33,9 +53,12 @@ async def cmd_ask(client, message):
     
     await message.edit_text("🤖 **Pensando...**")
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        resposta = await asyncio.to_thread(lambda: model.generate_content(pergunta).text)
+        def run_ai():
+            modelo_nome = obter_modelo_otimizado(api_key)
+            model = genai.GenerativeModel(modelo_nome)
+            return model.generate_content(pergunta).text
+            
+        resposta = await asyncio.to_thread(run_ai)
         await message.edit_text(f"🤖 **Resposta:**\n\n{resposta}")
     except Exception as e:
         await message.edit_text(f"❌ Erro na IA: `{e}`")
@@ -62,9 +85,12 @@ async def cmd_resumir(client, message):
         conversa = "\n".join(reversed(msgs))
         prompt = f"Aqui estão as últimas mensagens de um chat. Crie um resumo conciso e em bullet points sobre os principais tópicos discutidos:\n\n{conversa}"
         
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        resposta = await asyncio.to_thread(lambda: model.generate_content(prompt).text)
+        def run_summary():
+            modelo_nome = obter_modelo_otimizado(api_key)
+            model = genai.GenerativeModel(modelo_nome)
+            return model.generate_content(prompt).text
+            
+        resposta = await asyncio.to_thread(run_summary)
         await message.edit_text(f"📝 **Resumo do Chat:**\n\n{resposta}")
     except Exception as e:
         await message.edit_text(f"❌ Erro ao resumir: `{e}`")
