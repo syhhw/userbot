@@ -98,17 +98,15 @@ async def auditoria(client, acao, user, chat, motivo=None, msg_orig=None):
     nome = getattr(user, "first_name", "Desconhecido") if user else "Desconhecido"
     uid = getattr(user, "id", "?") if user else "?"
     chat_titulo = getattr(chat, "title", "Chat Privado")
-    txt = (
-        f"🛡️ **AUDITORIA DE MODERAÇÃO**\n\n"
-        f"⚙️ **Ação:** `{acao}`\n"
-        f"👤 **Alvo:** {nome} (`{uid}`)\n"
-        f"📍 **Chat:** {chat_titulo}\n"
+    txt = tr(client,
+        f"🛡️ **AUDITORIA DE MODERAÇÃO**\n\n⚙️ **Ação:** `{acao}`\n👤 **Alvo:** {nome} (`{uid}`)\n📍 **Chat:** {chat_titulo}\n",
+        f"🛡️ **MODERATION AUDIT**\n\n⚙️ **Action:** `{acao}`\n👤 **Target:** {nome} (`{uid}`)\n📍 **Chat:** {chat_titulo}\n"
     )
     if motivo:
-        txt += f"📝 **Motivo:** `{motivo}`\n"
+        txt += tr(client, f"📝 **Motivo:** `{motivo}`\n", f"📝 **Reason:** `{motivo}`\n")
     if msg_orig:
-        conteudo = msg_orig.text or msg_orig.caption or "[Mídia]"
-        txt += f"\n💬 **Mensagem original:**\n`{conteudo[:400]}`"
+        conteudo = msg_orig.text or msg_orig.caption or tr(client, "[Mídia]", "[Media]")
+        txt += tr(client, f"\n💬 **Mensagem original:**\n`{conteudo[:400]}`", f"\n💬 **Original message:**\n`{conteudo[:400]}`")
     try:
         await client.send_message(log_id, txt)
     except:

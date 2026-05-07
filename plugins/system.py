@@ -200,7 +200,7 @@ async def cmd_idioma(client, message):
 @Client.on_message(cmd_filter("speed") & filters.me)
 async def cmd_speed(client, message):
     """Testa a velocidade da internet da VM."""
-    await message.edit_text("🚀 **Testando velocidade...**")
+    await message.edit_text(tr(client, "🚀 **Testando velocidade...**", "🚀 **Testing speed...**"))
     try:
         def run_speedtest():
             st = speedtest.Speedtest()
@@ -210,15 +210,20 @@ async def cmd_speed(client, message):
             return st.results.dict()
             
         r = await asyncio.to_thread(run_speedtest)
-        await message.edit_text(
+        await message.edit_text(tr(client,
             f"🌐 **Network Speedtest**\n"
             f"├ ⬇️ **Download:** `{r['download']/10**6:.2f} Mbps`\n"
             f"├ ⬆️ **Upload:** `{r['upload']/10**6:.2f} Mbps`\n"
             f"├ 📶 **Ping:** `{r['ping']:.1f} ms`\n"
-            f"└ 🏢 **Servidor:** `{r['server']['name']}`"
-        )
+            f"└ 🏢 **Servidor:** `{r['server']['name']}`",
+            f"🌐 **Network Speedtest**\n"
+            f"├ ⬇️ **Download:** `{r['download']/10**6:.2f} Mbps`\n"
+            f"├ ⬆️ **Upload:** `{r['upload']/10**6:.2f} Mbps`\n"
+            f"├ 📶 **Ping:** `{r['ping']:.1f} ms`\n"
+            f"└ 🏢 **Server:** `{r['server']['name']}`"
+        ))
     except Exception as e:
-        await message.edit_text(f"❌ Erro: `{e}`")
+        await message.edit_text(tr(client, f"❌ Erro: `{e}`", f"❌ Error: `{e}`"))
     deletar_depois(message, 15)
 
 

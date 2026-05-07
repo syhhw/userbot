@@ -216,6 +216,9 @@ logger.info(f"🔧 Prefixo carregado: '{PREFIXO}'")
 LANGUAGE = config.get("LANGUAGE", "pt")
 logger.info(f"🌐 Idioma / Language: '{LANGUAGE.upper()}'")
 
+def tr_log(pt: str, en: str) -> str:
+    return en if LANGUAGE == "en" else pt
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 🟢 AUTENTICAÇÃO GOOGLE DRIVE (opcional)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -275,7 +278,8 @@ def manipulador_erros(loop, context):
     if any(x in erro for x in ["Peer id invalid", "Message to delete not found", "MESSAGE_NOT_MODIFIED"]):
         return
     try:
-        app.loop.create_task(app.send_message(config["ID_CANAL_LOGS"], f"⚠️ **ALERTA DO SISTEMA:**\nErro interno detectado em uma das tarefas de execução:\n`{erro}`"))
+        msg = tr_log(f"⚠️ **ALERTA DO SISTEMA:**\nErro interno detectado em uma das tarefas de execução:\n`{erro}`", f"⚠️ **SYSTEM ALERT:**\nInternal error detected in an execution task:\n`{erro}`")
+        app.loop.create_task(app.send_message(config["ID_CANAL_LOGS"], msg))
     except Exception:
         pass
     loop.default_exception_handler(context)
@@ -289,9 +293,9 @@ async def iniciar():
 
     em_background = "--background" in sys.argv or _ja_esta_em_screen()
     if em_background:
-        screen_info = "\n🖥️ Rodando em **segundo plano**"
+        screen_info = tr_log("\n🖥️ Rodando em **segundo plano**", "\n🖥️ Running in **background**")
     else:
-        screen_info = "\n🖥️ Rodando em **primeiro plano** (terminal aberto)"
+        screen_info = tr_log("\n🖥️ Rodando em **primeiro plano** (terminal aberto)", "\n🖥️ Running in **foreground** (terminal open)")
 
     try:
         if os.path.exists(UPDATE_FLAG):

@@ -4,7 +4,7 @@ Sistema de Auto-Respostas Passivas (Gatilhos)
 """
 import re
 from pyrogram import filters, Client
-from utils.helpers import cmd_filter, prefixo, carregar, salvar
+from utils.helpers import cmd_filter, prefixo, carregar, salvar, tr
 
 @Client.on_message(cmd_filter("addtrigger") & filters.me)
 async def cmd_addtrigger(client, message):
@@ -12,7 +12,7 @@ async def cmd_addtrigger(client, message):
     p = prefixo(client)
     matches = re.findall(r'"([^"]*)"', message.text)
     if len(matches) < 2:
-        return await message.edit_text(f"⚠️ Use: `{p}addtrigger \"palavra\" \"resposta\"`")
+        return await message.edit_text(tr(client, f"⚠️ Use: `{p}addtrigger \"palavra\" \"resposta\"`", f"⚠️ Use: `{p}addtrigger \"word\" \"response\"`"))
     
     gatilho = matches[0].lower()
     resposta = matches[1]
@@ -21,7 +21,7 @@ async def cmd_addtrigger(client, message):
     triggers[gatilho] = resposta
     salvar("triggers.json", triggers)
     
-    await message.edit_text(f"✅ **Trigger salvo!**\nSe disserem: `{gatilho}`\nResponderei: `{resposta}`")
+    await message.edit_text(tr(client, f"✅ **Trigger salvo!**\nSe disserem: `{gatilho}`\nResponderei: `{resposta}`", f"✅ **Trigger saved!**\nIf they say: `{gatilho}`\nI'll reply: `{resposta}`"))
 
 
 @Client.on_message(cmd_filter("deltrigger") & filters.me)
@@ -35,9 +35,9 @@ async def cmd_deltrigger(client, message):
     if gatilho in triggers:
         del triggers[gatilho]
         salvar("triggers.json", triggers)
-        await message.edit_text(f"🗑️ **Trigger removido:** `{gatilho}`")
+        await message.edit_text(tr(client, f"🗑️ **Trigger removido:** `{gatilho}`", f"🗑️ **Trigger removed:** `{gatilho}`"))
     else:
-        await message.edit_text(f"❌ **Trigger não encontrado:** `{gatilho}`")
+        await message.edit_text(tr(client, f"❌ **Trigger não encontrado:** `{gatilho}`", f"❌ **Trigger not found:** `{gatilho}`"))
 
 
 @Client.on_message(cmd_filter("triggers") & filters.me)
@@ -45,9 +45,9 @@ async def cmd_triggers(client, message):
     """Lista todos os gatilhos ativos."""
     triggers = carregar("triggers.json", {})
     if not triggers:
-        return await message.edit_text("⚠️ **Nenhum trigger configurado.**")
+        return await message.edit_text(tr(client, "⚠️ **Nenhum trigger configurado.**", "⚠️ **No triggers configured.**"))
         
-    txt = "⚡ **Meus Triggers:**\n\n" + "".join([f"• `{k}` ➡️ `{v}`\n" for k, v in triggers.items()])
+    txt = tr(client, "⚡ **Meus Triggers:**\n\n", "⚡ **My Triggers:**\n\n") + "".join([f"• `{k}` ➡️ `{v}`\n" for k, v in triggers.items()])
     await message.edit_text(txt)
 
 

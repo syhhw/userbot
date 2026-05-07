@@ -81,7 +81,7 @@ def cabecalho():
     print(f"{AZUL}{NEGRITO}║   🚀 USERBOT PRO v2.1 - SETUP INTELIGENTE  ║{RESET}")
     print(f"{AZUL}{NEGRITO}╚════════════════════════════════════════════╝{RESET}\n")
     print(f"  {CIANO}Python:{RESET} {sys.executable}")
-    print(f"  {CIANO}Venv ativa:{RESET} {VERDE}Sim ✅{RESET}\n")
+    print(t(f"  {CIANO}Venv ativa:{RESET} {VERDE}Sim ✅{RESET}\n", f"  {CIANO}Active venv:{RESET} {VERDE}Yes ✅{RESET}\n"))
 
 
 def checar_arquivo(arq, descricao, critico=True):
