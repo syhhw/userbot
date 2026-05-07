@@ -268,6 +268,7 @@ def main():
             config['BOT_TOKEN'] = bot_token
             
         print(f"\n  {CIANO}ℹ️  (Opcional) Chave API do Google Gemini para comandos de Inteligência Artificial.{RESET}")
+        print(f"  {AMARELO}Pegue a sua chave grátis em: https://aistudio.google.com/app/apikey{RESET}")
         gemini_key = input(f"  🤖 GEMINI_API_KEY (Enter para pular): ").strip()
         if gemini_key:
             config['GEMINI_API_KEY'] = gemini_key
