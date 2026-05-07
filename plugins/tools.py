@@ -21,17 +21,19 @@ async def cmd_hack(client, message):
     """Simula um hack animado (diversão)."""
     alvo = message.reply_to_message.from_user.first_name if message.reply_to_message else "SISTEMA"
     passos = [
-        f"💀 **TARGET LOCKED:** `{alvo}`\n🔍 Scanning open ports...",
-        f"🌐 `[▰▰▱▱▱▱▱▱▱▱]` 20%\n🔓 Bypassing firewall...",
-        f"🔑 `[▰▰▰▰▱▱▱▱▱▱]` 40%\n💉 Injecting SQL payload...",
-        f"🔥 `[▰▰▰▰▰▰▱▱▱▱]` 60%\n🔐 Brute-forcing SSH...",
-        f"⚡ `[▰▰▰▰▰▰▰▰▱▱]` 80%\n🖥️ Root access granted!",
-        f"☢️ `[▰▰▰▰▰▰▰▰▰▰]` 100%\n\n💀 **HACK COMPLETO**\n🎯 `{alvo}` comprometido.\n🔒 Sistema sob controle."
+        f"💀 **INICIANDO ATAQUE DIRECIONADO**\n🎯 **Alvo:** `{alvo}`",
+        f"🔍 `[▰▱▱▱▱▱▱▱▱▱]` 10%\nBuscando IP e rastreando conexão...",
+        f"📡 `[▰▰▰▱▱▱▱▱▱▱]` 30%\nInterceptando tráfego MTProto do Telegram...",
+        f"🔑 `[▰▰▰▰▰▱▱▱▱▱]` 50%\nQuebrando criptografia ponta-a-ponta (AES-256)...",
+        f"📱 `[▰▰▰▰▰▰▰▱▱▱]` 70%\nClonando sessão e contornando 2FA...",
+        f"📂 `[▰▰▰▰▰▰▰▰▰▱]` 90%\nBaixando histórico de mensagens, fotos e áudios...",
+        f"☢️ `[▰▰▰▰▰▰▰▰▰▰]` 100%\nInjeção de rootkit finalizada.",
+        f"💀 **HACK CONCLUÍDO COM SUCESSO** 💀\n\n🎯 Conta de `{alvo}` totalmente comprometida.\n📸 Todos os dados privados foram copiados para um servidor remoto.\n\n💸 **ATENÇÃO:** Envie **10 Bitcoins** para a carteira abaixo em 24h ou tudo será vazado:\n`bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh`"
     ]
     for passo in passos:
         try:
             await message.edit_text(passo)
-            await asyncio.sleep(random.uniform(0.9, 1.5))
+            await asyncio.sleep(random.uniform(1.5, 2.5))
         except:
             pass
 
@@ -49,7 +51,7 @@ async def cmd_type(client, message):
         digitado += ch
         try:
             await message.edit_text(f"{digitado}▌")
-            await asyncio.sleep(0.07)
+            await asyncio.sleep(random.uniform(0.04, 0.15))
         except:
             pass
     await message.edit_text(digitado)
@@ -120,20 +122,36 @@ async def cmd_tr(client, message):
 
 @Client.on_message(cmd_filter("voz") & filters.me)
 async def cmd_voz(client, message):
-    """Converte texto em mensagem de voz."""
+    """Converte texto em voz. Sotaques: br, pt, en, es, ja, ru"""
     p = prefixo(client)
-    partes = message.text.split(None, 1)
-    if len(partes) > 1:
-        texto = partes[1]
-    elif message.reply_to_message and (message.reply_to_message.text or message.reply_to_message.caption):
+    
+    sotaques_map = {
+        "br": ("pt", "com.br"), "pt": ("pt", "pt"),
+        "en": ("en", "com"), "es": ("es", "es"),
+        "ja": ("ja", "co.jp"), "ru": ("ru", "ru")
+    }
+    
+    lang, tld = "pt", "com.br"
+    texto = ""
+    
+    partes = message.text.split()
+    if len(partes) > 1 and partes[1].lower() in sotaques_map:
+        lang, tld = sotaques_map[partes[1].lower()]
+        texto = " ".join(partes[2:])
+    elif len(partes) > 1:
+        texto = " ".join(partes[1:])
+        
+    if not texto and message.reply_to_message:
         texto = message.reply_to_message.text or message.reply_to_message.caption
-    else:
-        return await message.edit_text(f"⚠️ Use: `{p}voz [texto]` ou responda a uma mensagem.")
+        
+    if not texto:
+        return await message.edit_text(f"⚠️ Use: `{p}voz [sotaque] [texto]`\nEx: `{p}voz pt Fala gajo!` ou `{p}voz en Ola amigo`")
+        
     await message.edit_text("🎙️ **Gerando áudio...**")
     arquivo = "voz_temp.ogg"
     try:
         def gerar_tts():
-            tts = gTTS(text=texto, lang='pt')
+            tts = gTTS(text=texto, lang=lang, tld=tld)
             tts.save(arquivo)
             
         await asyncio.to_thread(gerar_tts)
