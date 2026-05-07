@@ -11,6 +11,8 @@ import psutil
 import humanize
 import speedtest
 import subprocess
+import platform
+import pyrogram
 
 from pyrogram import filters, Client
 from utils.helpers import cmd_filter, salvar
@@ -204,19 +206,35 @@ async def cmd_speed(client, message):
 
 @Client.on_message(cmd_filter("sysinfo") & filters.me)
 async def cmd_sysinfo(client, message):
-    """Exibe informações de CPU, RAM e disco da VM."""
-    cpu   = psutil.cpu_percent(interval=1)
-    ram   = psutil.virtual_memory()
+    """Exibe informações do sistema no estilo neofetch."""
+    cpu = psutil.cpu_percent(interval=0.5)
+    ram = psutil.virtual_memory()
     disco = psutil.disk_usage('/')
+    
     inicio = getattr(client, "tempo_inicio", time.time())
-    uptime = humanize.precisedelta(time.time() - inicio, minimum_unit="seconds")
-    await message.edit_text(
-        f"🖥️ **Status da VM**\n\n"
-        f"⏱️ Uptime do bot: `{uptime}`\n"
-        f"📈 CPU: `{cpu}%`\n"
-        f"💾 RAM: `{ram.percent}%` ({humanize.naturalsize(ram.used)} / {humanize.naturalsize(ram.total)})\n"
-        f"💿 Disco: `{disco.percent}%` ({humanize.naturalsize(disco.used)} / {humanize.naturalsize(disco.total)})"
+    uptime_bot = humanize.precisedelta(time.time() - inicio, minimum_unit="seconds")
+    uptime_os = humanize.precisedelta(time.time() - psutil.boot_time(), minimum_unit="minutes")
+    
+    os_info = f"{platform.system()} {platform.release()} ({platform.machine()})"
+    py_ver = platform.python_version()
+    pyro_ver = pyrogram.__version__
+    versao = getattr(client, "VERSAO", "1.0")
+
+    texto = (
+        f"💻 **System Info (Neofetch)**\n\n"
+        f"```text\n"
+        f"OS       : {os_info}\n"
+        f"Bot Up   : {uptime_bot}\n"
+        f"Sys Up   : {uptime_os}\n"
+        f"CPU      : {psutil.cpu_count(logical=True)} Cores @ {cpu}%\n"
+        f"RAM      : {humanize.naturalsize(ram.used)} / {humanize.naturalsize(ram.total)} ({ram.percent}%)\n"
+        f"Disk     : {humanize.naturalsize(disco.used)} / {humanize.naturalsize(disco.total)} ({disco.percent}%)\n"
+        f"Python   : {py_ver}\n"
+        f"Pyrogram : {pyro_ver}\n"
+        f"Userbot  : v{versao}\n"
+        f"```"
     )
+    await message.edit_text(texto)
 
 
 @Client.on_message(cmd_filter("processos") & filters.me)
